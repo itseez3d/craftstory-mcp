@@ -18,7 +18,7 @@ const text = (data: unknown) => ({ content: [{ type: "text" as const, text: type
 const fail = (err: unknown) => ({ isError: true, content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }] });
 
 export function buildServer(client: CraftStoryClient): McpServer {
-  const server = new McpServer({ name: "craftstory", version: "0.1.2" });
+  const server = new McpServer({ name: "craftstory", version: "0.1.3" });
 
   server.registerTool(
     "list_models",

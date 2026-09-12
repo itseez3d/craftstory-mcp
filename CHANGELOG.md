@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 - 2026-09-12
+- tool annotations (readOnlyHint / destructiveHint) on every tool; Privacy Policy section in the README
+- MCPB bundle for Claude Desktop (manifest.json, icon) attached to GitHub releases
+- `mcpName` for the official MCP Registry; server.json
+
 ## 0.1.2 - 2026-09-12
 - package metadata: public repository and issue tracker on GitHub (itseez3d/craftstory-mcp); CHANGELOG shipped
 - wait_for_job: every request inside the wait is capped by the time left, so the call really returns within timeout_s (+ a few seconds for the result fetch)

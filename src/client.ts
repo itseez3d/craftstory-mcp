@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { basename } from "node:path";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.1.2";
+export const USER_AGENT = "craftstory-mcp/0.1.3";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "craftstory",
   "display_name": "CraftStory",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Talking-avatar videos from a photo: CraftStory 2.0 (any length, lip-sync, gestures) and MiniMax H3 clips with generated sound, straight from Claude.",
   "long_description": "Turn a photo into a talking video from Claude. Pick a voice, write the script, and get a lip-synced video with natural gestures (CraftStory 2.0, any length, 8-15 minutes per video), or a short clip with generated sound (MiniMax H3, up to 15 s). Uses your CraftStory account and credits; a plan with API access and an API key from Account -> API Access are required.",
   "author": {

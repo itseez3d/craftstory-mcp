@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.itseez3d/craftstory-mcp",
+  "title": "CraftStory",
+  "description": "Talking-avatar videos from a photo (CraftStory 2.0, any length, lip-sync and gestures) and short clips with generated sound (MiniMax H3) via the CraftStory API.",
+  "repository": {
+    "url": "https://github.com/itseez3d/craftstory-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://craftstory.com/mcp/",
+  "version": "0.1.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@craftstory/mcp",
+      "version": "0.1.3",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CRAFTSTORY_API_KEY",
+          "description": "CraftStory API key (sk-cs-...), created in the app under Account -> API Access; requires a plan with API access",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

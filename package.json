@@ -1,6 +1,7 @@
 {
   "name": "@craftstory/mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
+  "mcpName": "io.github.itseez3d/craftstory-mcp",
   "description": "MCP server for the CraftStory API: talking-avatar videos from a photo (CraftStory 2.0) and short clips with generated sound (MiniMax H3), from Claude, Cursor and other MCP clients.",
   "type": "module",
   "bin": {
