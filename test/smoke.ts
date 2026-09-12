@@ -18,7 +18,7 @@ const prompts = await client.listPrompts();
 console.log("prompts:", prompts.prompts.map((p) => p.name).join(", "));
 
 async function call(name: string, args: Record<string, unknown>) {
-  const r = await client.callTool({ name, arguments: args });
+  const r = await client.callTool({ name, arguments: args }, undefined, { timeout: 90_000 });
   const body = (r.content as { type: string; text: string }[])[0]?.text ?? "";
   let parsed: unknown = body;
   try { parsed = JSON.parse(body); } catch { /* plain text */ }
@@ -36,7 +36,7 @@ const clip = await call("create_audio_clip", { text: "Hello from the CraftStory 
 console.log("create_audio_clip:", clip.isError ? body(clip) : "id " + (clip.body as { id: string }).id);
 const clipId = (clip.body as { id: string }).id;
 
-const waited = await call("wait_for_job", { model: "audio-clip", id: clipId, timeout_s: 30 });
+const waited = await call("wait_for_job", { model: "audio-clip", id: clipId, timeout_s: 20 });
 const w = waited.body as { state: string; status: string };
 console.log(`wait_for_job(audio-clip): state=${w.state} status=${w.status}`);
 
@@ -55,7 +55,7 @@ if (withH3) {
   console.log("create_minimax_h3_video:", body(h3));
   const id = (h3.body as { id: string }).id;
   for (let i = 0; i < 8; i++) {
-    const r = await call("wait_for_job", { model: "minimax-h3", id, timeout_s: 60 });
+    const r = await call("wait_for_job", { model: "minimax-h3", id, timeout_s: 55 });
     const s = r.body as { state: string; status: string; status_percentage?: number; result?: { video_url?: string; credits?: number } };
     console.log(`  wait_for_job: ${s.state} ${s.status} ${s.status_percentage ?? ""}%`);
     if (s.state !== "running") { console.log("  result:", s.result?.video_url ? "video_url ok" : "no video", "credits", s.result?.credits); break; }

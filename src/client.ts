@@ -51,7 +51,14 @@ export class CraftStoryClient {
       headers["Content-Type"] = "application/json";
       payload = JSON.stringify(body);
     }
-    const res = await this.fetchImpl(`${this.base}${path}`, { method, headers, body: payload });
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.base}${path}`, { method, headers, body: payload });
+    } catch (e) {
+      // Node's fetch hides the reason behind "fetch failed"; surface the cause (DNS, TLS, reset...).
+      const cause = (e as { cause?: { code?: string; message?: string } }).cause;
+      throw new Error(`Network error calling ${method} ${path}: ${cause?.code ?? ""} ${cause?.message ?? (e as Error).message}`.trim());
+    }
     const text = await res.text();
     let data: unknown = text;
     try {

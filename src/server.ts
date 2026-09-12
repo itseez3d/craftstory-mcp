@@ -255,16 +255,16 @@ export function buildServer(client: CraftStoryClient): McpServer {
     {
       title: "Wait for a job (bounded polling)",
       description:
-        "Polls a job's status every few seconds for up to timeout_s (default 60, max 120) and returns as soon as it is terminal. " +
+        "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. " +
         "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, audio clips seconds. Reports progress notifications when the client supports them.",
       inputSchema: {
         model: z.enum(JOB_KINDS),
         id: z.string().uuid(),
-        timeout_s: z.number().int().min(5).max(120).optional().describe("How long this call may wait (default 60)"),
+        timeout_s: z.number().int().min(5).max(55).optional().describe("How long this call may wait (default 45, max 55)"),
       },
     },
     async ({ model, id, timeout_s }, extra) => {
-      const deadline = Date.now() + (timeout_s ?? 60) * 1000;
+      const deadline = Date.now() + (timeout_s ?? 45) * 1000;
       const token = extra._meta?.progressToken;
       let last: Awaited<ReturnType<CraftStoryClient["getStatus"]>> | undefined;
       try {

@@ -50,7 +50,7 @@ Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (o
 | `create_minimax_h3_video` | Start a MiniMax H3 job (basic or reference mode) |
 | `get_job_status` | Status, percentage, failure reason, refund flag |
 | `get_job_result` | Full record with the signed video URL (valid 7 days) |
-| `wait_for_job` | Bounded polling (default 60 s); call again while `state` is `running` |
+| `wait_for_job` | Bounded polling (default 45 s, max 55 s); call again while `state` is `running` |
 | `upscale_video` | New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 2x) |
 
 Plus the prompt `talking_video_from_photo` (script + photo) that walks the model through the whole flow.
@@ -61,7 +61,7 @@ Plus the prompt `talking_video_from_photo` (script + photo) that walks the model
 
 The assistant will: `list_voices` -> `create_audio_clip` -> `wait_for_job(audio-clip)` -> `preview_cost` -> `create_craftstory2_video` (resolution `720_1280`, gestures `calm`) -> `wait_for_job(craftstory-2)` a few times -> `get_job_result` -> the video URL.
 
-Long jobs: `wait_for_job` never blocks longer than `timeout_s` (max 120 s). A CraftStory 2.0 video needs several calls; that is by design so agent runtimes do not time out.
+Long jobs: `wait_for_job` never blocks longer than `timeout_s` (max 55 s, under the 60 s tool-call limit of most clients). A CraftStory 2.0 video needs several calls; that is by design so agent runtimes do not time out.
 
 ## Local files vs URLs
 
