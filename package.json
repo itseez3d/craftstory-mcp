@@ -1,0 +1,29 @@
+{
+  "name": "@craftstory/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the CraftStory API: talking-avatar videos from a photo (CraftStory 2.0) and short clips with generated sound (MiniMax H3), from Claude, Cursor and other MCP clients.",
+  "type": "module",
+  "bin": { "craftstory-mcp": "dist/index.js" },
+  "main": "dist/index.js",
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test test/*.test.ts",
+    "smoke": "tsx test/smoke.ts"
+  },
+  "keywords": ["mcp", "model-context-protocol", "craftstory", "ai-video", "talking-avatar", "lip-sync", "text-to-video", "minimax"],
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/itseez3d/craftstory-mcp" },
+  "homepage": "https://craftstory.com",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
