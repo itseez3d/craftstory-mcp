@@ -81,6 +81,15 @@ npm test
 
 Full API reference: https://api.craftstory.com/api/v1/docs/public/ and the curl walkthrough at https://api.craftstory.com/api/v1/docs/samples/curl/.
 
+## Privacy Policy
+
+This server runs on your machine and keeps no data of its own. It sends your API key and the inputs you pass to tools
+(text, photos, audio, reference files) only to the CraftStory API at `CRAFTSTORY_API_BASE` (default
+`https://api.craftstory.com`), where they are processed under the CraftStory privacy policy:
+https://craftstory.com/privacy/. Generated videos and uploaded files are stored in your CraftStory account and can be
+deleted there or via the API; nothing is retained locally by the server. No analytics or third-party services are
+called by the server itself. Questions: support via https://craftstory.com/contacts/.
+
 ## License
 
 MIT

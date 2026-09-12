@@ -1,0 +1,123 @@
+{
+  "manifest_version": "0.3",
+  "name": "craftstory",
+  "display_name": "CraftStory",
+  "version": "0.1.2",
+  "description": "Talking-avatar videos from a photo: CraftStory 2.0 (any length, lip-sync, gestures) and MiniMax H3 clips with generated sound, straight from Claude.",
+  "long_description": "Turn a photo into a talking video from Claude. Pick a voice, write the script, and get a lip-synced video with natural gestures (CraftStory 2.0, any length, 8-15 minutes per video), or a short clip with generated sound (MiniMax H3, up to 15 s). Uses your CraftStory account and credits; a plan with API access and an API key from Account -> API Access are required.",
+  "author": {
+    "name": "CraftStory",
+    "url": "https://craftstory.com"
+  },
+  "homepage": "https://craftstory.com/mcp/",
+  "documentation": "https://github.com/itseez3d/craftstory-mcp#readme",
+  "support": "https://github.com/itseez3d/craftstory-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itseez3d/craftstory-mcp"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "CRAFTSTORY_API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "list_models",
+      "description": "Video models with status, limits and credit prices"
+    },
+    {
+      "name": "list_voices",
+      "description": "Library and cloned voices for text-to-speech"
+    },
+    {
+      "name": "list_avatars",
+      "description": "Custom avatars and their scenes"
+    },
+    {
+      "name": "create_audio_clip",
+      "description": "Speech from text + voice, or upload a recording"
+    },
+    {
+      "name": "preview_cost",
+      "description": "Credit estimate for a CraftStory 2.0 video"
+    },
+    {
+      "name": "create_craftstory2_video",
+      "description": "Start a CraftStory 2.0 talking video (photo + audio)"
+    },
+    {
+      "name": "create_minimax_h3_video",
+      "description": "Start a MiniMax H3 clip (basic or reference mode)"
+    },
+    {
+      "name": "get_job_status",
+      "description": "Status, percentage, failure reason, refund flag"
+    },
+    {
+      "name": "get_job_result",
+      "description": "Finished job with the signed video URL"
+    },
+    {
+      "name": "wait_for_job",
+      "description": "Bounded polling until a job is done"
+    },
+    {
+      "name": "upscale_video",
+      "description": "New job with the upscaled result"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "talking_video_from_photo",
+      "description": "Script + photo -> talking video, step by step",
+      "arguments": [
+        "script",
+        "photo"
+      ],
+      "text": "Make a talking video of the person in ${arguments.photo} saying: \"${arguments.script}\". Use list_voices to pick a voice, create_audio_clip for the speech, wait_for_job until the clip is done, preview_cost, then create_craftstory2_video and wait_for_job repeatedly until it reports done; finish with get_job_result and give me the video URL."
+    }
+  ],
+  "keywords": [
+    "video",
+    "avatar",
+    "talking-head",
+    "lip-sync",
+    "text-to-video",
+    "craftstory",
+    "minimax"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "CraftStory API key",
+      "description": "Create one in the CraftStory app: Account -> API Access (keys look like sk-cs-...). Requires a plan with API access.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "privacy_policies": [
+    "https://craftstory.com/privacy/"
+  ]
+}

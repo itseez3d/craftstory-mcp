@@ -24,6 +24,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "list_models",
     {
       title: "List CraftStory video models",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Catalogue of the video models behind this server with their status, modes, limits and credit prices. " +
         "Two models today: craftstory-2 (a talking video of any length from one photo plus an audio clip; 8-15 min) " +
@@ -44,6 +45,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "list_voices",
     {
       title: "List voices for text-to-speech",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Library voices (id, name, language, gender) usable as voice_id in create_audio_clip. " +
         "With include_cloned=true also returns the account's own cloned voices, usable as voice_user_id. Voices are cloned in the CraftStory app, not via the API.",
@@ -64,6 +66,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "list_avatars",
     {
       title: "List custom avatars (and their scenes)",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Custom avatars trained in the CraftStory app that craftstory-2 can generate with (pass an id as avatar_id). " +
         "Each avatar may carry a default voice {id, voice_kind}: voice_kind 'user' means send it as voice_user_id, 'library' as voice_id in create_audio_clip. " +
@@ -83,6 +86,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "create_audio_clip",
     {
       title: "Create an audio clip (speech from text, or upload a recording)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "The soundtrack every video model takes as input. Either text (up to 2000 characters) plus exactly one voice (voice_id from list_voices, or voice_user_id for a cloned voice), " +
         "or file_path to upload a local WAV/MP3/M4A recording. Returns the clip id; it is ready when wait_for_job(model='audio-clip') reports done (usually seconds). " +
@@ -112,6 +116,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "preview_cost",
     {
       title: "Estimate the credit cost of a CraftStory 2.0 video",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Credits a craftstory-2 job would cost for the given audio clips and settings, without creating anything. " +
         "Rate per second of audio: 480p 2.2 (2 with lipsync_mode=empty), 720p 3.3 (3 with empty); rounded up per job. MiniMax H3 is a flat 3.3 credits per billed second.",
@@ -134,6 +139,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "create_craftstory2_video",
     {
       title: "Create a CraftStory 2.0 talking video (photo + audio)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Start a craftstory-2 generation: a photo of a person (image_url or image_path, or a custom avatar scene via scene_id) speaks the given audio clips with lip-sync, gestures and natural motion; any length. " +
         "resolution is WIDTH_HEIGHT (480_832 / 720_1280 portrait, 832_480 / 1280_720 landscape); 1080p is available afterwards via upscale_video. " +
@@ -179,6 +185,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "create_minimax_h3_video",
     {
       title: "Create a MiniMax H3 clip (up to 15 s)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. " +
         "mode='reference': one audio_clip_id drives the clip with lip-sync (first 15 s billed); user_prompt is optional; up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a product or background consistent. " +
@@ -221,6 +228,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "get_job_status",
     {
       title: "Get a job's status",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Status of a video job or audio clip: status, status_percentage, status_failed, credits_refunded. Terminal states: done; failed*, rejected_* and not_pass_moderation (audio) are failures. " +
         "Prefer wait_for_job, which polls for you.",
@@ -239,6 +247,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "get_job_result",
     {
       title: "Get a finished job (video URL and details)",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`; all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
       inputSchema: { model: z.enum(JOB_KINDS), id: z.string().uuid() },
@@ -256,6 +265,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "wait_for_job",
     {
       title: "Wait for a job (bounded polling)",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. " +
         "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, audio clips seconds. Reports progress notifications when the client supports them.",
@@ -309,6 +319,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
     "upscale_video",
     {
       title: "Upscale a finished video (new job)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Creates a NEW job with the upscaled result; the original stays. craftstory-2: only 720p sources, resolution 1080_1920 (from 720_1280) or 1920_1080 (from 1280_720). minimax-h3: always 2x, no resolution needed. " +
         "Costs 0.2 credits per second. Poll the returned id with wait_for_job.",
