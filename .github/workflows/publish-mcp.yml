@@ -1,0 +1,26 @@
+name: publish to MCP Registry
+# npm publishing stays manual (2FA). On a version tag this job publishes the matching
+# server.json to the official MCP Registry with the repository's OIDC identity, which
+# carries the io.github.itseez3d/* namespace without any personal token.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the npm package for this version exists
+        run: |
+          VERSION=$(jq -r .version server.json)
+          npm view "@craftstory/mcp@$VERSION" version
+      - name: Install mcp-publisher
+        run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+      - name: Authenticate (OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Validate and publish server.json
+        run: ./mcp-publisher validate && ./mcp-publisher publish
