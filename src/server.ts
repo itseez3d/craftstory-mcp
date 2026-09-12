@@ -18,7 +18,7 @@ const text = (data: unknown) => ({ content: [{ type: "text" as const, text: type
 const fail = (err: unknown) => ({ isError: true, content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }] });
 
 export function buildServer(client: CraftStoryClient): McpServer {
-  const server = new McpServer({ name: "craftstory", version: "0.1.0" });
+  const server = new McpServer({ name: "craftstory", version: "0.1.1" });
 
   server.registerTool(
     "list_models",
@@ -269,6 +269,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
       let last: Awaited<ReturnType<CraftStoryClient["getStatus"]>> | undefined;
       try {
         while (true) {
+          if (Date.now() >= deadline && last) return text({ state: "running", ...last, hint: "still running - call wait_for_job again" });
           last = await client.getStatus(model as JobKind, id);
           const state = classify(last.status);
           if (token !== undefined) {
@@ -281,8 +282,9 @@ export function buildServer(client: CraftStoryClient): McpServer {
             const result = state === "done" ? await client.getResult(model as JobKind, id) : undefined;
             return text({ state, ...last, ...(result ? { result } : {}) });
           }
-          if (Date.now() >= deadline) return text({ state: "running", ...last, hint: "still running - call wait_for_job again" });
-          await new Promise((r) => setTimeout(r, model === "audio-clip" ? 2000 : 5000));
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return text({ state: "running", ...last, hint: "still running - call wait_for_job again" });
+          await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" ? 2000 : 5000, remaining)));
         }
       } catch (e) {
         return fail(e);

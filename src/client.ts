@@ -6,7 +6,9 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.1.0";
+export const USER_AGENT = "craftstory-mcp/0.1.1";
+/** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
+export const REQUEST_TIMEOUT_MS = 25_000;
 
 export type ModelId = "craftstory-2" | "minimax-h3";
 export type JobKind = ModelId | "audio-clip";
@@ -53,9 +55,10 @@ export class CraftStoryClient {
     }
     let res: Response;
     try {
-      res = await this.fetchImpl(`${this.base}${path}`, { method, headers, body: payload });
+      res = await this.fetchImpl(`${this.base}${path}`, { method, headers, body: payload, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     } catch (e) {
       // Node's fetch hides the reason behind "fetch failed"; surface the cause (DNS, TLS, reset...).
+      if ((e as Error).name === "TimeoutError") throw new Error(`Timeout after ${REQUEST_TIMEOUT_MS / 1000}s calling ${method} ${path}`);
       const cause = (e as { cause?: { code?: string; message?: string } }).cause;
       throw new Error(`Network error calling ${method} ${path}: ${cause?.code ?? ""} ${cause?.message ?? (e as Error).message}`.trim());
     }

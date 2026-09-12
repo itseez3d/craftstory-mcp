@@ -61,7 +61,7 @@ Plus the prompt `talking_video_from_photo` (script + photo) that walks the model
 
 The assistant will: `list_voices` -> `create_audio_clip` -> `wait_for_job(audio-clip)` -> `preview_cost` -> `create_craftstory2_video` (resolution `720_1280`, gestures `calm`) -> `wait_for_job(craftstory-2)` a few times -> `get_job_result` -> the video URL.
 
-Long jobs: `wait_for_job` never blocks longer than `timeout_s` (max 55 s, under the 60 s tool-call limit of most clients). A CraftStory 2.0 video needs several calls; that is by design so agent runtimes do not time out.
+Long jobs: `wait_for_job` returns after at most `timeout_s` (max 55 s) plus one in-flight status request (25 s HTTP timeout), which keeps it under the 60 s tool-call limit of most clients in normal conditions. A CraftStory 2.0 video needs several calls; that is by design so agent runtimes do not time out.
 
 ## Local files vs URLs
 
