@@ -1,0 +1,26 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: packaged server answers initialize + tools/list over stdio
+        run: |
+          npm pack --silent
+          mkdir -p /tmp/pk && npm install --silent --prefix /tmp/pk ./craftstory-mcp-*.tgz
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' '{"jsonrpc":"2.0","method":"notifications/initialized"}' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            | CRAFTSTORY_API_KEY=sk-cs-ci /tmp/pk/node_modules/.bin/craftstory-mcp | grep -c '"name":"list_models"'

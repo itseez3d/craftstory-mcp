@@ -69,3 +69,34 @@ test("job paths per kind and a readable 401", async () => {
   assert.equal(c.jobPath("minimax-h3", "x"), "/minimax-h3/x/");
   await assert.rejects(c.getStatus("craftstory-2", "x"), (e: unknown) => e instanceof ApiError && e.status === 401 && /Subscription expired/.test(e.message));
 });
+
+test("a per-request timeout budget aborts a hung status call", async () => {
+  const never: typeof fetch = ((_input: unknown, init?: RequestInit) =>
+    new Promise((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "TimeoutError" }))))) as typeof fetch;
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl: never });
+  // AbortSignal.timeout() timers are unref'd; a real request keeps the loop alive via its socket,
+  // the fake one does not, so hold the loop open for the duration of the test.
+  const keepAlive = setInterval(() => {}, 100);
+  try {
+    const t0 = Date.now();
+    await assert.rejects(c.getStatus("minimax-h3", "x", 1000), /Timeout after 1s/);
+    assert.ok(Date.now() - t0 < 3000, "returned promptly after the budget");
+  } finally {
+    clearInterval(keepAlive);
+  }
+});
+
+test("plaintext API base is refused unless explicitly allowed", () => {
+  assert.throws(() => new CraftStoryClient({ apiKey: "k", baseUrl: "http://localhost:8000/api/v1" }), /must use https/);
+  process.env.CRAFTSTORY_ALLOW_HTTP = "1";
+  try {
+    assert.ok(new CraftStoryClient({ apiKey: "k", baseUrl: "http://localhost:8000/api/v1" }));
+  } finally {
+    delete process.env.CRAFTSTORY_ALLOW_HTTP;
+  }
+});
+
+test("~/ in a local path expands to the home directory", async () => {
+  const { fileOrUrl } = await import("../src/client.js");
+  await assert.rejects(fileOrUrl({ path: "~/definitely-missing-craftstory-mcp.jpg" }, "image"), (e: NodeJS.ErrnoException) => e.code === "ENOENT" && !e.message.includes("~/"));
+});

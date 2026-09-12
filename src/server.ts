@@ -18,7 +18,7 @@ const text = (data: unknown) => ({ content: [{ type: "text" as const, text: type
 const fail = (err: unknown) => ({ isError: true, content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }] });
 
 export function buildServer(client: CraftStoryClient): McpServer {
-  const server = new McpServer({ name: "craftstory", version: "0.1.1" });
+  const server = new McpServer({ name: "craftstory", version: "0.1.2" });
 
   server.registerTool(
     "list_models",
@@ -96,8 +96,10 @@ export function buildServer(client: CraftStoryClient): McpServer {
     },
     async ({ text: script, voice_id, voice_user_id, file_path }) => {
       try {
+        if (file_path && (script || voice_id || voice_user_id)) throw new Error("Pass either file_path or text + one voice, not both");
         if (file_path) return text(await client.createAudioClipFromFile(file_path));
         if (!script) throw new Error("Pass text (with a voice) or file_path");
+        if (voice_id && voice_user_id) throw new Error("Pass exactly one of voice_id or voice_user_id");
         if (!voice_id && !voice_user_id) throw new Error("Pass voice_id (library voice) or voice_user_id (cloned voice) with text");
         return text(await client.createAudioClipFromText(script, voice_id ? { voice_id } : { voice_user_id }));
       } catch (e) {
@@ -139,7 +141,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         "so call wait_for_job(model='craftstory-2') repeatedly until it reports done, then get_job_result for the video URL.",
       inputSchema: {
         image_url: z.string().url().optional().describe("Public URL of the photo (JPG/PNG)"),
-        image_path: z.string().optional().describe("Local path of the photo to upload (<= 20 MB)"),
+        image_path: z.string().optional().describe("Absolute local path of the photo to upload (JPG/PNG/HEIC, <= 20 MB); ~/ is expanded"),
         scene_id: z.string().uuid().optional().describe("Custom avatar scene id (from list_avatars) used instead of a photo"),
         avatar_id: z.string().uuid().optional().describe("Custom avatar id (from list_avatars); its trained model drives identity"),
         audio_clip_ids: z.array(z.string().uuid()).min(1).describe("Audio clip ids (from create_audio_clip), played in order"),
@@ -267,10 +269,14 @@ export function buildServer(client: CraftStoryClient): McpServer {
       const deadline = Date.now() + (timeout_s ?? 45) * 1000;
       const token = extra._meta?.progressToken;
       let last: Awaited<ReturnType<CraftStoryClient["getStatus"]>> | undefined;
+      const running = () => text({ state: "running", ...last, hint: "still running - call wait_for_job again" });
       try {
         while (true) {
-          if (Date.now() >= deadline && last) return text({ state: "running", ...last, hint: "still running - call wait_for_job again" });
-          last = await client.getStatus(model as JobKind, id);
+          // Every request is capped by the time left, so the call returns within timeout_s
+          // (plus at most a few seconds for the final result fetch).
+          const budget = deadline - Date.now();
+          if (budget <= 0 && last) return running();
+          last = await client.getStatus(model as JobKind, id, Math.min(25_000, Math.max(3_000, budget)));
           const state = classify(last.status);
           if (token !== undefined) {
             await extra.sendNotification({
@@ -279,11 +285,18 @@ export function buildServer(client: CraftStoryClient): McpServer {
             });
           }
           if (state !== "running") {
-            const result = state === "done" ? await client.getResult(model as JobKind, id) : undefined;
+            let result: Record<string, unknown> | undefined;
+            if (state === "done") {
+              try {
+                result = await client.getResult(model as JobKind, id, Math.min(10_000, Math.max(3_000, deadline - Date.now())));
+              } catch {
+                return text({ state, ...last, hint: "finished - call get_job_result for the video URL" });
+              }
+            }
             return text({ state, ...last, ...(result ? { result } : {}) });
           }
           const remaining = deadline - Date.now();
-          if (remaining <= 0) return text({ state: "running", ...last, hint: "still running - call wait_for_job again" });
+          if (remaining <= 0) return running();
           await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" ? 2000 : 5000, remaining)));
         }
       } catch (e) {

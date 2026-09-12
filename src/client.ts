@@ -3,10 +3,11 @@
  * Every method maps 1:1 onto a documented endpoint; no business logic lives here.
  */
 import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename } from "node:path";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.1.1";
+export const USER_AGENT = "craftstory-mcp/0.1.2";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
@@ -30,8 +31,9 @@ export async function fileOrUrl(input: { url?: string; path?: string }, field: s
   if (input.url && input.path) throw new Error(`${field}: pass either a URL or a local path, not both`);
   if (input.url) return { url: input.url };
   if (input.path) {
-    const bytes = await readFile(input.path);
-    return { blob: new Blob([bytes]), name: basename(input.path) };
+    const path = input.path.startsWith("~/") ? homedir() + input.path.slice(1) : input.path;
+    const bytes = await readFile(path);
+    return { blob: new Blob([bytes]), name: basename(path) };
   }
   throw new Error(`${field}: a URL or a local file path is required`);
 }
@@ -42,10 +44,15 @@ export class CraftStoryClient {
 
   constructor(private readonly opts: ClientOptions) {
     this.base = (opts.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
+    // The bearer key and uploads travel to this host: plaintext HTTP only on explicit request.
+    if (!this.base.startsWith("https://") && process.env.CRAFTSTORY_ALLOW_HTTP !== "1") {
+      throw new Error(`CRAFTSTORY_API_BASE must use https:// (got ${this.base}); set CRAFTSTORY_ALLOW_HTTP=1 to override for local testing`);
+    }
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
-  private async request<T>(method: string, path: string, body?: FormData | Record<string, unknown>): Promise<T> {
+  /** timeoutMs caps this one request (default REQUEST_TIMEOUT_MS); wait_for_job passes its remaining budget. */
+  private async request<T>(method: string, path: string, body?: FormData | Record<string, unknown>, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
     const headers: Record<string, string> = { Authorization: `Bearer ${this.opts.apiKey}`, "User-Agent": USER_AGENT, Accept: "application/json" };
     let payload: BodyInit | undefined;
     if (body instanceof FormData) payload = body;
@@ -55,10 +62,10 @@ export class CraftStoryClient {
     }
     let res: Response;
     try {
-      res = await this.fetchImpl(`${this.base}${path}`, { method, headers, body: payload, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      res = await this.fetchImpl(`${this.base}${path}`, { method, headers, body: payload, signal: AbortSignal.timeout(Math.max(1000, timeoutMs)) });
     } catch (e) {
       // Node's fetch hides the reason behind "fetch failed"; surface the cause (DNS, TLS, reset...).
-      if ((e as Error).name === "TimeoutError") throw new Error(`Timeout after ${REQUEST_TIMEOUT_MS / 1000}s calling ${method} ${path}`);
+      if ((e as Error).name === "TimeoutError") throw new Error(`Timeout after ${Math.round(Math.max(1000, timeoutMs) / 1000)}s calling ${method} ${path}`);
       const cause = (e as { cause?: { code?: string; message?: string } }).cause;
       throw new Error(`Network error calling ${method} ${path}: ${cause?.code ?? ""} ${cause?.message ?? (e as Error).message}`.trim());
     }
@@ -73,8 +80,8 @@ export class CraftStoryClient {
     return data as T;
   }
 
-  get<T>(path: string) {
-    return this.request<T>("GET", path);
+  get<T>(path: string, timeoutMs?: number) {
+    return this.request<T>("GET", path, undefined, timeoutMs);
   }
   post<T>(path: string, body?: FormData | Record<string, unknown>) {
     return this.request<T>("POST", path, body);
@@ -181,13 +188,14 @@ export class CraftStoryClient {
   jobPath(kind: JobKind, id: string) {
     return kind === "audio-clip" ? `/audio/clips/${id}/` : `/${kind}/${id}/`;
   }
-  getStatus(kind: JobKind, id: string) {
+  getStatus(kind: JobKind, id: string, timeoutMs?: number) {
     return this.get<{ status: string; status_percentage?: number; status_failed?: string | null; credits_refunded?: unknown }>(
       `${this.jobPath(kind, id)}status/`,
+      timeoutMs,
     );
   }
-  getResult(kind: JobKind, id: string) {
-    return this.get<Record<string, unknown>>(this.jobPath(kind, id));
+  getResult(kind: JobKind, id: string, timeoutMs?: number) {
+    return this.get<Record<string, unknown>>(this.jobPath(kind, id), timeoutMs);
   }
 }
 

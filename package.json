@@ -1,6 +1,6 @@
 {
   "name": "@craftstory/mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for the CraftStory API: talking-avatar videos from a photo (CraftStory 2.0) and short clips with generated sound (MiniMax H3), from Claude, Cursor and other MCP clients.",
   "type": "module",
   "bin": {
@@ -10,16 +10,18 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
     "start": "node dist/index.js",
     "test": "node --import tsx --test test/*.test.ts",
-    "smoke": "tsx test/smoke.ts"
+    "smoke": "tsx test/smoke.ts",
+    "prepack": "npm run build"
   },
   "keywords": [
     "mcp",
@@ -32,7 +34,7 @@
     "minimax"
   ],
   "license": "MIT",
-  "homepage": "https://craftstory.com",
+  "homepage": "https://github.com/itseez3d/craftstory-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^3.24.0"
