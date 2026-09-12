@@ -43,6 +43,10 @@
     "typescript": "^5.6.0"
   },
   "bugs": {
-    "url": "https://api.craftstory.com/api/v1/docs/public/"
+    "url": "https://github.com/itseez3d/craftstory-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itseez3d/craftstory-mcp.git"
   }
 }
