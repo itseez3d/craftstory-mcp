@@ -7,6 +7,24 @@ Generate talking-avatar videos from Claude, Cursor, Claude Code or any other [MC
 
 You need Node.js 20 or newer, a CraftStory account on a plan with API access, and an API key (app: **Account -> API Access**, keys look like `sk-cs-...`). Generations are billed in credits exactly like in the app; failed jobs are refunded.
 
+## Config
+
+Standard MCP configuration, identical for every client (Claude Desktop, Cursor, Windsurf, VS Code, Zed...):
+
+```json
+{
+  "mcpServers": {
+    "craftstory": {
+      "command": "npx",
+      "args": ["-y", "@craftstory/mcp"],
+      "env": {
+        "CRAFTSTORY_API_KEY": "sk-cs-..."
+      }
+    }
+  }
+}
+```
+
 ## Install
 
 ### Claude Code
@@ -41,19 +59,17 @@ Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (o
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `list_models` | Models, status (a paused model answers 503), limits and prices |
-| `list_voices` | Library voices; `include_cloned` adds your cloned voices |
-| `list_avatars` | Your custom avatars, or the scenes of one avatar |
-| `create_audio_clip` | Speech from text + voice, or upload a local recording |
-| `preview_cost` | Credit estimate for a CraftStory 2.0 video |
-| `create_craftstory2_video` | Start a CraftStory 2.0 job (photo or avatar scene + audio clips) |
-| `create_minimax_h3_video` | Start a MiniMax H3 job (basic or reference mode) |
-| `get_job_status` | Status, percentage, failure reason, refund flag |
-| `get_job_result` | Full record with the signed video URL (valid 7 days) |
-| `wait_for_job` | Bounded polling (default 45 s, max 55 s); call again while `state` is `running` |
-| `upscale_video` | New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 2x) |
+- `list_models`: Models, status (a paused model answers 503), limits and prices
+- `list_voices`: Library voices; `include_cloned` adds your cloned voices
+- `list_avatars`: Your custom avatars, or the scenes of one avatar
+- `create_audio_clip`: Speech from text + voice, or upload a local recording
+- `preview_cost`: Credit estimate for a CraftStory 2.0 video
+- `create_craftstory2_video`: Start a CraftStory 2.0 job (photo or avatar scene + audio clips)
+- `create_minimax_h3_video`: Start a MiniMax H3 job (basic or reference mode)
+- `get_job_status`: Status, percentage, failure reason, refund flag
+- `get_job_result`: Full record with the signed video URL (valid 7 days)
+- `wait_for_job`: Bounded polling (default 45 s, max 55 s); call again while `state` is `running`
+- `upscale_video`: New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 2x)
 
 Plus the prompt `talking_video_from_photo` (script + photo) that walks the model through the whole flow.
 
