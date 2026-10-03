@@ -56,10 +56,15 @@ test("minimax h3 routes basic and reference modes to their endpoints", async () 
   const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(201, { id: "h" }, calls) });
   await c.createMiniMaxH3({ mode: "basic", image: { url: "https://x/p.jpg" }, user_prompt: "waves", requested_duration_s: 5 });
   await c.createMiniMaxH3({ mode: "reference", image: { url: "https://x/p.jpg" }, audios: ["a1"] });
+  await c.createMiniMaxH3({ mode: "reference", image: { url: "https://x/p.jpg" }, user_prompt: 'says "hi"', requested_duration_s: 7 });
   assert.equal(calls[0].url, "https://api.craftstory.com/api/v1/minimax-h3/");
   assert.equal((calls[0].body as FormData).get("requested_duration_s"), "5");
   assert.equal(calls[1].url, "https://api.craftstory.com/api/v1/minimax-h3/reference/");
   assert.deepEqual((calls[1].body as FormData).getAll("audios"), ["a1"]);
+  assert.equal((calls[1].body as FormData).get("requested_duration_s"), null); // the audio sets the length
+  assert.equal(calls[2].url, "https://api.craftstory.com/api/v1/minimax-h3/reference/");
+  assert.deepEqual((calls[2].body as FormData).getAll("audios"), []);
+  assert.equal((calls[2].body as FormData).get("requested_duration_s"), "7");
 });
 
 test("job paths per kind and a readable 401", async () => {

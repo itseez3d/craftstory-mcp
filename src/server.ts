@@ -188,15 +188,16 @@ export function buildServer(client: CraftStoryClient): McpServer {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. " +
-        "mode='reference': one audio_clip_id drives the clip with lip-sync (first 15 s billed); user_prompt is optional; up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a product or background consistent. " +
+        "mode='reference': the reference model. With audio_clip_id the clip is lip-synced to it (first 15 s billed) and user_prompt is optional. Without audio_clip_id, pass requested_duration_s and a user_prompt with the spoken line in quotes: the model voices it and generates the soundtrack. " +
+        "Either way up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a second person, a product or a background consistent. " +
         "Output is 768 px on the short side, orientation follows the photo. Cost 3.3 credits per billed second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
       inputSchema: {
         mode: z.enum(["basic", "reference"]),
         image_url: z.string().url().optional(),
         image_path: z.string().optional(),
         user_prompt: z.string().optional().describe("Scene / motion description (required in basic mode)"),
-        requested_duration_s: z.number().int().min(5).max(15).optional().describe("Clip length in basic mode (default 8)"),
-        audio_clip_id: z.string().uuid().optional().describe("Reference mode: the clip that drives the video"),
+        requested_duration_s: z.number().int().min(5).max(15).optional().describe("Clip length when there is no audio (basic mode, or reference mode without audio_clip_id); default 8"),
+        audio_clip_id: z.string().uuid().optional().describe("Reference mode: the clip that drives the video; leave out to have the lines in user_prompt voiced"),
         reference_files: z.array(z.string()).optional().describe("Reference mode: local paths of extra reference images/videos/audio"),
         reference_captions: z.array(z.string()).optional().describe("One caption per reference file, same order"),
         name: z.string().optional(),
@@ -206,7 +207,9 @@ export function buildServer(client: CraftStoryClient): McpServer {
       try {
         if (!a.image_url && !a.image_path) throw new Error("Pass image_url or image_path");
         if (a.mode === "basic" && !a.user_prompt) throw new Error("basic mode needs user_prompt");
-        if (a.mode === "reference" && !a.audio_clip_id) throw new Error("reference mode needs audio_clip_id");
+        if (a.mode === "reference" && !a.audio_clip_id && !a.user_prompt) {
+          throw new Error("reference mode needs audio_clip_id, or a user_prompt with the line to be spoken");
+        }
         const r = await client.createMiniMaxH3({
           mode: a.mode,
           image: { url: a.image_url, path: a.image_path },

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.4 - 2026-10-03
+- create_minimax_h3_video: reference mode no longer needs audio_clip_id - with requested_duration_s and a user_prompt that holds the spoken line in quotes, the reference model voices it (API: POST /minimax-h3/reference/ without `audios`)
+
 ## 0.1.3 - 2026-09-12
 - tool annotations (readOnlyHint / destructiveHint) on every tool; Privacy Policy section in the README
 - MCPB bundle for Claude Desktop (manifest.json, icon) attached to GitHub releases

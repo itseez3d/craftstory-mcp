@@ -172,6 +172,8 @@ export class CraftStoryClient {
       return this.post<Record<string, unknown>>("/minimax-h3/", fd);
     }
     for (const a of args.audios ?? []) fd.append("audios", a);
+    // No audio: the reference model voices the description, so the length is ours to send.
+    if (!args.audios?.length) fd.append("requested_duration_s", String(args.requested_duration_s ?? 8));
     const captions = args.reference_captions ?? [];
     for (const [i, p] of (args.reference_files ?? []).entries()) {
       const f = await fileOrUrl({ path: p }, "reference_files");

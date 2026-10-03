@@ -3,7 +3,7 @@
 Generate talking-avatar videos from Claude, Cursor, Claude Code or any other [MCP](https://modelcontextprotocol.io) client, using the [CraftStory](https://craftstory.com) API:
 
 - **CraftStory 2.0** - a talking video of any length from one photo plus an audio clip (script + voice, your own recording, or a custom avatar). 8-15 minutes per video.
-- **MiniMax H3** - a clip of up to 15 s from one photo: description-driven with generated sound, or audio-driven with lip-sync. 1-3 minutes.
+- **MiniMax H3** - a clip of up to 15 s from one photo: description-driven with generated sound, audio-driven with lip-sync, or the reference model without audio (the lines written in the description are voiced; extra photos keep a second person or a product consistent). 1-3 minutes.
 
 You need Node.js 20 or newer, a CraftStory account on a plan with API access, and an API key (app: **Account -> API Access**, keys look like `sk-cs-...`). Generations are billed in credits exactly like in the app; failed jobs are refunded.
 
@@ -65,7 +65,7 @@ Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (o
 - `create_audio_clip`: Speech from text + voice, or upload a local recording
 - `preview_cost`: Credit estimate for a CraftStory 2.0 video
 - `create_craftstory2_video`: Start a CraftStory 2.0 job (photo or avatar scene + audio clips)
-- `create_minimax_h3_video`: Start a MiniMax H3 job (basic or reference mode)
+- `create_minimax_h3_video`: Start a MiniMax H3 job (basic, or reference mode with or without audio)
 - `get_job_status`: Status, percentage, failure reason, refund flag
 - `get_job_result`: Full record with the signed video URL (valid 7 days)
 - `wait_for_job`: Bounded polling (default 45 s, max 55 s); call again while `state` is `running`
