@@ -68,7 +68,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
       title: "List custom avatars (and their scenes)",
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
-        "Custom avatars trained in the CraftStory app that craftstory-2 can generate with (pass an id as avatar_id). " +
+        "Custom avatars trained in the CraftStory app that craftstory-2 can generate with (pass an id as avatar_id); `models` lists which endpoints take the id — when it includes 'minimax-h3' the avatar also works with create_minimax_h3_avatar_video. " +
         "Each avatar may carry a default voice {id, voice_kind}: voice_kind 'user' means send it as voice_user_id, 'library' as voice_id in create_audio_clip. " +
         "Pass avatar_id to list that avatar's scenes; a scene id can replace the photo (scene_id) in create_craftstory2_video.",
       inputSchema: { avatar_id: z.string().uuid().optional().describe("Return the scenes of this avatar instead of the avatar list") },
@@ -221,6 +221,37 @@ export function buildServer(client: CraftStoryClient): McpServer {
           name: a.name,
         });
         return text({ id: r.id, status: r.status, credits: r.credits, next: "wait_for_job(model='minimax-h3', id=...) until done (1-3 min), then get_job_result" });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_minimax_h3_avatar_video",
+    {
+      title: "Create a MiniMax H3 clip where a LoRA avatar speaks your text (5-14 s)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      description:
+        "Avatar mode of minimax-h3: a custom LoRA avatar from list_avatars (its `models` must include 'minimax-h3'; sample actors are not accepted) says speech_text verbatim in its own voice, inside one of its scenes (scene_id, default the first; see list_avatars with avatar_id). " +
+        "No photo and no audio clip are sent: the avatar's training video teaches the model the face, voice and manner. user_prompt describes the scene and manner. " +
+        "5-14 s: pass requested_duration_s or let the length follow the text (about 15 characters per second). Up to 3 extra reference_files, images or audio, no video; extra photos lower the ceiling (0-1: 14 s, 2: 12 s, 3: 10 s). " +
+        "The first run of an avatar builds its profile (about a minute more); later runs reuse it. Cost 5.6 credits per second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (10-25 min).",
+      inputSchema: {
+        avatar_id: z.string().uuid(),
+        scene_id: z.string().uuid().optional(),
+        speech_text: z.string().min(1).describe("What the avatar says, verbatim"),
+        user_prompt: z.string().optional().describe("Scene and manner, e.g. 'Selfie video, shows the product to the camera'"),
+        requested_duration_s: z.number().int().min(5).max(14).optional(),
+        reference_files: z.array(z.string()).max(3).optional().describe("Local paths of up to 3 extra reference images/audio (no video)"),
+        reference_captions: z.array(z.string()).optional().describe("One caption per reference file, same order"),
+        name: z.string().optional(),
+      },
+    },
+    async (a) => {
+      try {
+        const r = await client.createMiniMaxH3Avatar(a);
+        return text({ id: r.id, status: r.status, credits: r.credits, next: "wait_for_job(model='minimax-h3', id=...) until done (10-25 min), then get_job_result" });
       } catch (e) {
         return fail(e);
       }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 - 2026-10-07
+
+- New tool `create_minimax_h3_avatar_video`: a custom LoRA avatar (from `list_avatars`, `models` incl. `minimax-h3`) speaks `speech_text` in its own voice inside one of its scenes; 5-14 s, up to 3 extra image/audio references, 5.6 credits per second (`POST /api/v1/minimax-h3/avatar/`).
+- `list_avatars` rows carry `models`: which endpoints take the id (`craftstory-2`, `minimax-h3`).
+
 ## 0.1.5 - 2026-10-06
 
 - Pricing text follows the new per-mode MiniMax H3 rates: 4.2 credits per billed second in basic and reference modes, 5.6 in avatar mode (was a flat 3.3). No tool or parameter changes.

@@ -182,6 +182,31 @@ export class CraftStoryClient {
     }
     return this.post<Record<string, unknown>>("/minimax-h3/reference/", fd);
   }
+  async createMiniMaxH3Avatar(args: {
+    avatar_id: string;
+    scene_id?: string;
+    speech_text: string;
+    user_prompt?: string;
+    requested_duration_s?: number;
+    reference_files?: string[];
+    reference_captions?: string[];
+    name?: string;
+  }) {
+    const fd = new FormData();
+    fd.append("avatar_id", args.avatar_id);
+    if (args.scene_id) fd.append("scene_id", args.scene_id);
+    fd.append("speech_text", args.speech_text);
+    if (args.user_prompt) fd.append("user_prompt", args.user_prompt);
+    if (args.requested_duration_s) fd.append("requested_duration_s", String(args.requested_duration_s));
+    if (args.name) fd.append("name", args.name);
+    const captions = args.reference_captions ?? [];
+    for (const [i, p] of (args.reference_files ?? []).entries()) {
+      const f = await fileOrUrl({ path: p }, "reference_files");
+      fd.append("reference_files", f.blob!, f.name);
+      fd.append("reference_captions", captions[i] ?? "");
+    }
+    return this.post<Record<string, unknown>>("/minimax-h3/avatar/", fd);
+  }
   upscaleMiniMaxH3(id: string) {
     return this.post<Record<string, unknown>>(`/minimax-h3/${id}/upscale/`);
   }

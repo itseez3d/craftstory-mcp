@@ -65,7 +65,7 @@ Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (o
 - `create_audio_clip`: Speech from text + voice, or upload a local recording
 - `preview_cost`: Credit estimate for a CraftStory 2.0 video
 - `create_craftstory2_video`: Start a CraftStory 2.0 job (photo or avatar scene + audio clips)
-- `create_minimax_h3_video`: Start a MiniMax H3 job (basic, or reference mode with or without audio)
+- `create_minimax_h3_video`, `create_minimax_h3_avatar_video`: Start a MiniMax H3 job (basic, or reference mode with or without audio)
 - `get_job_status`: Status, percentage, failure reason, refund flag
 - `get_job_result`: Full record with the signed video URL (valid 7 days)
 - `wait_for_job`: Bounded polling (default 45 s, max 55 s); call again while `state` is `running`
