@@ -119,7 +119,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Credits a craftstory-2 job would cost for the given audio clips and settings, without creating anything. " +
-        "Rate per second of audio: 480p 2.2 (2 with lipsync_mode=empty), 720p 3.3 (3 with empty); rounded up per job. MiniMax H3 is a flat 3.3 credits per billed second.",
+        "Rate per second of audio: 480p 2.2 (2 with lipsync_mode=empty), 720p 3.3 (3 with empty); rounded up per job. MiniMax H3: 4.2 credits per billed second (basic and reference modes), 5.6 in avatar mode.",
       inputSchema: {
         audio_clip_ids: z.array(z.string().uuid()).min(1),
         resolution: z.enum(RESOLUTIONS),
@@ -190,7 +190,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. " +
         "mode='reference': the reference model. With audio_clip_id the clip is lip-synced to it (first 15 s billed) and user_prompt is optional. Without audio_clip_id, pass requested_duration_s and a user_prompt with the spoken line in quotes: the model voices it and generates the soundtrack. " +
         "Either way up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a second person, a product or a background consistent. " +
-        "Output is 768 px on the short side, orientation follows the photo. Cost 3.3 credits per billed second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
+        "Output is 768 px on the short side, orientation follows the photo. Cost 4.2 credits per billed second (basic and reference), charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
       inputSchema: {
         mode: z.enum(["basic", "reference"]),
         image_url: z.string().url().optional(),

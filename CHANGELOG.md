@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 - 2026-10-06
+
+- Pricing text follows the new per-mode MiniMax H3 rates: 4.2 credits per billed second in basic and reference modes, 5.6 in avatar mode (was a flat 3.3). No tool or parameter changes.
+
 ## 0.1.4 - 2026-10-03
 - create_minimax_h3_video: reference mode no longer needs audio_clip_id - with requested_duration_s and a user_prompt that holds the spoken line in quotes, the reference model voices it (API: POST /minimax-h3/reference/ without `audios`)
 
