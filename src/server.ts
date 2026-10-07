@@ -230,10 +230,10 @@ export function buildServer(client: CraftStoryClient): McpServer {
   server.registerTool(
     "create_minimax_h3_avatar_video",
     {
-      title: "Create a MiniMax H3 clip where a LoRA avatar speaks your text (5-14 s)",
+      title: "Create a MiniMax H3 clip where your custom avatar speaks your text (5-14 s)",
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
-        "Avatar mode of minimax-h3: a custom LoRA avatar from list_avatars (its `models` must include 'minimax-h3'; sample actors are not accepted) says speech_text verbatim in its own voice, inside one of its scenes (scene_id, default the first; see list_avatars with avatar_id). " +
+        "Avatar mode of minimax-h3: a custom avatar from list_avatars (its `models` must include 'minimax-h3'; sample actors are not accepted) says speech_text verbatim in its own voice, inside one of its scenes (scene_id, default the first; see list_avatars with avatar_id). " +
         "No photo and no audio clip are sent: the avatar's training video teaches the model the face, voice and manner. user_prompt describes the scene and manner. " +
         "5-14 s: pass requested_duration_s or let the length follow the text (about 15 characters per second). Up to 3 extra reference_files, images or audio, no video; extra photos lower the ceiling (0-1: 14 s, 2: 12 s, 3: 10 s). " +
         "The first run of an avatar builds its profile (about a minute more); later runs reuse it. Cost 5.6 credits per second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (10-25 min).",

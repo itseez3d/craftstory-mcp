@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.1.7 - 2026-10-07
+
+- Copy: tool texts say "custom avatar" instead of "LoRA avatar"; `list_avatars` rows now also carry `lora_status` / `h3_status` where the API provides them (an avatar is usable with minimax-h3 right after upload, with craftstory-2 once training finishes).
+
 ## 0.1.6 - 2026-10-07
 
-- New tool `create_minimax_h3_avatar_video`: a custom LoRA avatar (from `list_avatars`, `models` incl. `minimax-h3`) speaks `speech_text` in its own voice inside one of its scenes; 5-14 s, up to 3 extra image/audio references, 5.6 credits per second (`POST /api/v1/minimax-h3/avatar/`).
+- New tool `create_minimax_h3_avatar_video`: a custom avatar (from `list_avatars`, `models` incl. `minimax-h3`) speaks `speech_text` in its own voice inside one of its scenes; 5-14 s, up to 3 extra image/audio references, 5.6 credits per second (`POST /api/v1/minimax-h3/avatar/`).
 - `list_avatars` rows carry `models`: which endpoints take the id (`craftstory-2`, `minimax-h3`).
 
 ## 0.1.5 - 2026-10-06
