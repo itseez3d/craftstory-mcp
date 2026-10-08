@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { basename } from "node:path";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.1.3";
+export const USER_AGENT = "craftstory-mcp/0.2.0";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
@@ -21,15 +21,27 @@ export class ApiError extends Error {
 }
 
 export interface ClientOptions {
-  apiKey: string;
+  /** sk-cs-... key (stdio mode). Exactly one of apiKey / authHeader is required. */
+  apiKey?: string;
+  /** Ready Authorization header value, e.g. "Auth0 <token>" in the hosted (OAuth) mode. */
+  authHeader?: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Whether `*_path` inputs may be read from this process's filesystem.
+   * True for the stdio server running on the user's machine; false for the
+   * hosted server, where a path would name a file on OUR host, not the user's.
+   */
+  allowLocalFiles?: boolean;
 }
 
 /** A file-or-URL input as the API accepts it: a URL string, or a local path that is uploaded. */
-export async function fileOrUrl(input: { url?: string; path?: string }, field: string): Promise<{ url?: string; blob?: Blob; name?: string }> {
+export async function fileOrUrl(input: { url?: string; path?: string }, field: string, allowLocalFiles = true): Promise<{ url?: string; blob?: Blob; name?: string }> {
   if (input.url && input.path) throw new Error(`${field}: pass either a URL or a local path, not both`);
   if (input.url) return { url: input.url };
+  if (input.path && !allowLocalFiles) {
+    throw new Error(`${field}: local file paths are not available on the hosted CraftStory connector; pass a public URL (or attach the file to the chat and give its URL)`);
+  }
   if (input.path) {
     const path = input.path.startsWith("~/") ? homedir() + input.path.slice(1) : input.path;
     const bytes = await readFile(path);
@@ -42,8 +54,14 @@ export class CraftStoryClient {
   private readonly base: string;
   private readonly fetchImpl: typeof fetch;
 
+  private readonly authorization: string;
+  private readonly allowLocalFiles: boolean;
+
   constructor(private readonly opts: ClientOptions) {
     this.base = (opts.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
+    if (!opts.apiKey && !opts.authHeader) throw new Error("CraftStoryClient: apiKey or authHeader is required");
+    this.authorization = opts.authHeader ?? `Bearer ${opts.apiKey}`;
+    this.allowLocalFiles = opts.allowLocalFiles ?? true;
     // The bearer key and uploads travel to this host: plaintext HTTP only on explicit request.
     if (!this.base.startsWith("https://") && process.env.CRAFTSTORY_ALLOW_HTTP !== "1") {
       throw new Error(`CRAFTSTORY_API_BASE must use https:// (got ${this.base}); set CRAFTSTORY_ALLOW_HTTP=1 to override for local testing`);
@@ -53,7 +71,7 @@ export class CraftStoryClient {
 
   /** timeoutMs caps this one request (default REQUEST_TIMEOUT_MS); wait_for_job passes its remaining budget. */
   private async request<T>(method: string, path: string, body?: FormData | Record<string, unknown>, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.opts.apiKey}`, "User-Agent": USER_AGENT, Accept: "application/json" };
+    const headers: Record<string, string> = { Authorization: this.authorization, "User-Agent": USER_AGENT, Accept: "application/json" };
     let payload: BodyInit | undefined;
     if (body instanceof FormData) payload = body;
     else if (body !== undefined) {
@@ -110,7 +128,7 @@ export class CraftStoryClient {
   }
   async createAudioClipFromFile(path: string) {
     const fd = new FormData();
-    const { blob, name } = await fileOrUrl({ path }, "file");
+    const { blob, name } = await fileOrUrl({ path }, "file", this.allowLocalFiles);
     fd.append("file", blob!, name);
     return this.post<{ id: string }>("/audio/clips/", fd);
   }
@@ -133,7 +151,7 @@ export class CraftStoryClient {
   }) {
     const fd = new FormData();
     if (args.image?.url || args.image?.path) {
-      const img = await fileOrUrl(args.image, "image");
+      const img = await fileOrUrl(args.image, "image", this.allowLocalFiles);
       if (img.url) fd.append("image", img.url);
       else fd.append("image", img.blob!, img.name);
     }
@@ -164,7 +182,7 @@ export class CraftStoryClient {
   }) {
     const fd = new FormData();
     if (args.aspect_ratio) fd.append("aspect_ratio", args.aspect_ratio);
-    const img = await fileOrUrl(args.image, "image");
+    const img = await fileOrUrl(args.image, "image", this.allowLocalFiles);
     if (img.url) fd.append("image", img.url);
     else fd.append("image", img.blob!, img.name);
     if (args.user_prompt) fd.append("user_prompt", args.user_prompt);
@@ -178,7 +196,7 @@ export class CraftStoryClient {
     if (!args.audios?.length) fd.append("requested_duration_s", String(args.requested_duration_s ?? 8));
     const captions = args.reference_captions ?? [];
     for (const [i, p] of (args.reference_files ?? []).entries()) {
-      const f = await fileOrUrl({ path: p }, "reference_files");
+      const f = await fileOrUrl({ path: p }, "reference_files", this.allowLocalFiles);
       fd.append("reference_files", f.blob!, f.name);
       fd.append("reference_captions", captions[i] ?? "");
     }
@@ -205,7 +223,7 @@ export class CraftStoryClient {
     if (args.name) fd.append("name", args.name);
     const captions = args.reference_captions ?? [];
     for (const [i, p] of (args.reference_files ?? []).entries()) {
-      const f = await fileOrUrl({ path: p }, "reference_files");
+      const f = await fileOrUrl({ path: p }, "reference_files", this.allowLocalFiles);
       fd.append("reference_files", f.blob!, f.name);
       fd.append("reference_captions", captions[i] ?? "");
     }
@@ -238,7 +256,7 @@ export function classify(status: string): "done" | "failed" | "running" {
 }
 
 function describeError(status: number, body: unknown): string {
-  if (status === 401) return `401 Unauthorized: ${flatten(body)} (check CRAFTSTORY_API_KEY and that the plan includes API access)`;
+  if (status === 401) return `401 Unauthorized: ${flatten(body)} (stdio: check CRAFTSTORY_API_KEY and that the plan includes API access; hosted connector: sign in again)`;
   if (status === 402 || (status === 400 && JSON.stringify(body).includes("Low credits"))) return `Low credits: ${flatten(body)}`;
   if (status === 503) return `503: the model is paused right now (see list_models); retry later`;
   return `HTTP ${status}: ${flatten(body)}`;

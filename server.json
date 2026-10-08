@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://craftstory.com/mcp/",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@craftstory/mcp",
-      "version": "0.1.8",
+      "version": "0.2.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -27,6 +27,12 @@
           "format": "string"
         }
       ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.craftstory.com/mcp"
     }
   ]
 }

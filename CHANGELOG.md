@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Hosted mode: `craftstory-mcp-http` serves the same tools over Streamable HTTP with OAuth 2.1 (Auth0), for
+  claude.ai custom connectors; RFC 9728 protected-resource metadata, stateless transport, per-user rate limit.
+- Client accepts a ready `Authorization` header and can refuse local file paths (hosted mode).
+- Dockerfile for the hosted image.
+
 ## 0.1.8 - 2026-10-08
 
 - `aspect_ratio` on `create_minimax_h3_video` and `create_minimax_h3_avatar_video`: auto, 21:9, 16:9, 4:3, 1:1, 3:4, 9:16, 9:21, or 4:5 (rendered as 3:4 and center-cropped for ads).

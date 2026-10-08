@@ -27,6 +27,13 @@ Standard MCP configuration, identical for every client (Claude Desktop, Cursor, 
 
 ## Install
 
+### claude.ai (web and mobile): hosted connector
+
+No key and nothing to install. In claude.ai open **Settings → Connectors → Add custom connector**, paste
+`https://mcp.craftstory.com/mcp`, then sign in with your CraftStory account and allow access. The hosted
+server speaks Streamable HTTP with OAuth 2.1 (Auth0) and runs the same tools as the package below; local
+file paths are not available there, pass public URLs instead.
+
 ### Claude Code
 
 ```bash
@@ -84,6 +91,14 @@ Long jobs: `wait_for_job` returns within `timeout_s` (default 45 s, max 55 s) pl
 ## Local files vs URLs
 
 Photos accept `image_url` (JPG/PNG) or `image_path` (absolute path or `~/...`; JPG/PNG/HEIC, up to 20 MB, uploaded as multipart). Recordings and extra references are local paths too. Anything you pass as a path is uploaded to the CraftStory API, so keep your client's tool-approval prompts on (see SECURITY.md).
+
+## Hosted server (operators)
+
+`craftstory-mcp-http` serves the same tools over Streamable HTTP behind OAuth. Required env: `MCP_PUBLIC_URL`,
+`AUTH0_DOMAIN`; optional `MCP_AUDIENCE` (defaults to `<MCP_PUBLIC_URL>/mcp`), `CRAFTSTORY_API_BASE`, `PORT`
+(8788), `MCP_ALLOWED_ORIGINS`, `MCP_TRUST_PROXY=1` behind a load balancer. Protected-resource metadata is at
+`/.well-known/oauth-protected-resource/mcp`; access tokens are verified against the tenant's JWKS and forwarded
+to the CraftStory API, nothing is stored. `Dockerfile` builds the production image.
 
 ## Development
 

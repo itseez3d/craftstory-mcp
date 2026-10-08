@@ -1,11 +1,12 @@
 {
   "name": "@craftstory/mcp",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "mcpName": "io.github.itseez3d/craftstory-mcp",
   "description": "MCP server for the CraftStory API: talking-avatar videos from a photo (CraftStory 2.0) and short clips with generated sound (MiniMax H3), from Claude, Cursor and other MCP clients.",
   "type": "module",
   "bin": {
-    "craftstory-mcp": "dist/index.js"
+    "craftstory-mcp": "dist/index.js",
+    "craftstory-mcp-http": "dist/http.js"
   },
   "main": "dist/index.js",
   "files": [
@@ -18,11 +19,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js dist/http.js",
     "start": "node dist/index.js",
     "test": "node --import tsx --test test/*.test.ts",
     "smoke": "tsx test/smoke.ts",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "start:http": "node dist/http.js"
   },
   "keywords": [
     "mcp",
@@ -38,12 +40,16 @@
   "homepage": "https://github.com/itseez3d/craftstory-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "jose": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "@types/express": "^5.0.0"
   },
   "bugs": {
     "url": "https://github.com/itseez3d/craftstory-mcp/issues"
