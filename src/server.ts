@@ -9,7 +9,8 @@ import { z } from "zod";
 
 import { classify, CraftStoryClient, type JobKind } from "./client.js";
 
-const RESOLUTIONS = ["480_832", "832_480", "720_1280", "1280_720"] as const;
+const RESOLUTIONS = ["480_832", "832_480", "720_1280", "1280_720", "768_960"] as const;
+const UPSCALE_RESOLUTIONS = ["1080_1920", "1920_1080", "1152_1440"] as const;
 const GESTURES = ["normal", "calm", "expressive"] as const;
 const LIPSYNC = ["craftstory", "sync_so", "empty"] as const;
 const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip"] as const;
@@ -148,7 +149,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Start a craftstory-2 generation: a photo of a person (image_url or image_path, or a custom avatar scene via scene_id) speaks the given audio clips with lip-sync, gestures and natural motion; any length. " +
-        "resolution is WIDTH_HEIGHT (480_832 / 720_1280 portrait, 832_480 / 1280_720 landscape); 1080p is available afterwards via upscale_video. " +
+        "resolution is WIDTH_HEIGHT (480_832 / 720_1280 portrait, 832_480 / 1280_720 landscape, 768_960 for 4:5 portrait billed as 720p, audio under 30 minutes); a 1.5x upscale is available afterwards via upscale_video. " +
         "Credits are charged on create (see preview_cost) and refunded if the job fails. Returns the job id and initial status; generation takes 8-15 minutes, " +
         "so call wait_for_job(model='craftstory-2') repeatedly until it reports done, then get_job_result for the video URL.",
       inputSchema: {
@@ -448,18 +449,18 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       title: "Upscale a finished video (new job)",
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
-        "Creates a NEW job with the upscaled result; the original stays. craftstory-2: only 720p sources, resolution 1080_1920 (from 720_1280) or 1920_1080 (from 1280_720). minimax-h3: always 2x, no resolution needed. " +
+        "Creates a NEW job with the upscaled result; the original stays. craftstory-2: only 720p-tier sources, resolution 1080_1920 (from 720_1280), 1920_1080 (from 1280_720) or 1152_1440 (from 768_960). minimax-h3: always 2x, no resolution needed. " +
         "Costs 0.2 credits per second. Poll the returned id with wait_for_job.",
       inputSchema: {
         model: z.enum(["craftstory-2", "minimax-h3"]),
         id: z.string().uuid(),
-        resolution: z.enum(["1080_1920", "1920_1080"]).optional().describe("craftstory-2 only"),
+        resolution: z.enum(UPSCALE_RESOLUTIONS).optional().describe("craftstory-2 only"),
       },
     },
     async ({ model, id, resolution }) => {
       try {
         if (model === "craftstory-2") {
-          if (!resolution) throw new Error("craftstory-2 upscale needs resolution 1080_1920 or 1920_1080");
+          if (!resolution) throw new Error("craftstory-2 upscale needs resolution 1080_1920, 1920_1080 or 1152_1440");
           const r = await client.upscaleCraftStory2(id, resolution);
           return text({ id: r.id, status: r.status, credits: r.credits });
         }
@@ -487,7 +488,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
             text:
               `Make a talking video of the person in ${photo} saying: "${script}".\n` +
               "1) list_voices and pick a fitting voice. 2) create_audio_clip with the script and that voice; wait_for_job(model='audio-clip') until done. " +
-              "3) preview_cost, then create_craftstory2_video with the clip id, the photo and resolution 720_1280 (portrait) or 1280_720 (landscape). " +
+              "3) preview_cost, then create_craftstory2_video with the clip id, the photo and resolution 720_1280 (portrait), 1280_720 (landscape) or 768_960 (4:5). " +
               "4) wait_for_job(model='craftstory-2') repeatedly until done (8-15 minutes). 5) get_job_result and give me the video URL.",
           },
         },

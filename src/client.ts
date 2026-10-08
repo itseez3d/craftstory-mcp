@@ -164,7 +164,7 @@ export class CraftStoryClient {
     if (args.faceswap !== undefined) fd.append("faceswap", args.faceswap ? "true" : "false");
     return this.post<Record<string, unknown>>("/craftstory-2/", fd);
   }
-  upscaleCraftStory2(id: string, resolution: "1080_1920" | "1920_1080") {
+  upscaleCraftStory2(id: string, resolution: "1080_1920" | "1920_1080" | "1152_1440") {
     return this.post<Record<string, unknown>>(`/craftstory-2/${id}/upscale/`, { resolution });
   }
 

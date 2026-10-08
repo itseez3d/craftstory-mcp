@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- 4:5 portrait: `create_craftstory2_video` accepts `resolution: "768_960"` (billed as 720p, audio under
+  30 minutes); `upscale_video` takes `1152_1440` for it.
+
 ## 0.3.0
 
 - Upload links: `request_file_upload` gives the user a one-time page to drop a photo (15 minutes, one file);

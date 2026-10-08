@@ -88,7 +88,7 @@ Plus the prompt `talking_video_from_photo` (script + photo) that walks the model
 
 > Make a portrait video of the person in `/Users/me/photos/portrait.jpg` saying "Welcome to our spring collection", calm gestures.
 
-The assistant will: `list_voices` -> `create_audio_clip` -> `wait_for_job(audio-clip)` -> `preview_cost` -> `create_craftstory2_video` (resolution `720_1280`, gestures `calm`) -> `wait_for_job(craftstory-2)` a few times -> `get_job_result` -> the video URL.
+The assistant will: `list_voices` -> `create_audio_clip` -> `wait_for_job(audio-clip)` -> `preview_cost` -> `create_craftstory2_video` (resolution `720_1280`, or `768_960` for 4:5, gestures `calm`) -> `wait_for_job(craftstory-2)` a few times -> `get_job_result` -> the video URL.
 
 Long jobs: `wait_for_job` returns within `timeout_s` (default 45 s, max 55 s) plus a few seconds for the final result fetch; every request inside it is capped by the time left, so it stays under the 60 s tool-call limit of most clients. A CraftStory 2.0 video needs several calls; that is by design so agent runtimes do not time out. A CraftStory 2.0 video needs several calls; that is by design so agent runtimes do not time out.
 
