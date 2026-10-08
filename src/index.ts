@@ -15,6 +15,6 @@ if (!apiKey) {
 }
 
 const client = new CraftStoryClient({ apiKey, baseUrl: process.env.CRAFTSTORY_API_BASE ?? DEFAULT_BASE });
-const server = buildServer(client);
+const server = buildServer(client, { publicApiBase: process.env.CRAFTSTORY_API_BASE ?? DEFAULT_BASE });
 const transport = new StdioServerTransport();
 await server.connect(transport);

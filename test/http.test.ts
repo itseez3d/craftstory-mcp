@@ -198,6 +198,7 @@ test("upload tools: request_file_upload returns the link, wait_for_upload return
   const link = await call("request_file_upload", { hint: "the jacket photo" });
   assert.ok(!link.result.isError, JSON.stringify(link));
   assert.match(link.result.content[0].text, /https:\/\/app\.test\/upload\/tok/);
+  assert.match(link.result.content[0].text, /curl -sS -f -F .*api\.craftstory\.com\/api\/v1\/uploads\/by-token\/tok\//);
   const waited = await call("wait_for_upload", { upload_id: "11111111-1111-4111-8111-111111111111", timeout_s: 10 });
   assert.match(waited.result.content[0].text, /"status": "uploaded"/);
   assert.match(waited.result.content[0].text, /u\.jpg/);

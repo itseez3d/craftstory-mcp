@@ -13,7 +13,8 @@
  *  AUTH0_DOMAIN          - tenant domain, e.g. xxx.us.auth0.com
  *  MCP_AUDIENCE          - Auth0 API identifier; defaults to <MCP_PUBLIC_URL>/mcp
  *  MCP_SCOPES            - space-separated scopes this server advertises (default "craftstory")
- *  CRAFTSTORY_API_BASE   - defaults to https://api.craftstory.com/api/v1
+ *  CRAFTSTORY_API_BASE   - defaults to https://api.craftstory.com/api/v1 (may be an internal address)
+ *  MCP_PUBLIC_API_BASE   - public API base quoted to the model for self-uploads (default https://api.craftstory.com/api/v1)
  *  MCP_ALLOWED_ORIGINS   - comma-separated browser origins allowed to call /mcp (default: Anthropic's)
  *  PORT                  - default 8788
  *  MCP_TRUST_PROXY       - "1" behind a load balancer (X-Forwarded-For for rate limiting)
@@ -35,6 +36,7 @@ const app = createServer({
   audience: process.env.MCP_AUDIENCE ?? `${publicUrl}/mcp`,
   scopes: (process.env.MCP_SCOPES ?? "craftstory").split(/\s+/).filter(Boolean),
   apiBase: process.env.CRAFTSTORY_API_BASE,
+  publicApiBase: process.env.MCP_PUBLIC_API_BASE,
   allowedOrigins: process.env.MCP_ALLOWED_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean),
   trustProxy: process.env.MCP_TRUST_PROXY === "1",
 });

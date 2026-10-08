@@ -28,6 +28,8 @@ export interface HttpServerOptions {
   /** Scopes advertised in the protected-resource metadata. */
   scopes: string[];
   apiBase?: string;
+  /** Public API base shown to the model for commands it may run itself (defaults to the production API). */
+  publicApiBase?: string;
   allowedOrigins?: string[];
   trustProxy?: boolean;
   /** Requests per minute per user (default 60). */
@@ -130,7 +132,7 @@ export function createServer(opts: HttpServerOptions) {
       baseUrl: opts.apiBase ?? DEFAULT_BASE,
       allowLocalFiles: false,
     });
-    const server = buildServer(client);
+    const server = buildServer(client, { publicApiBase: opts.publicApiBase });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => {
       void transport.close();

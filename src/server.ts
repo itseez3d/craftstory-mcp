@@ -17,8 +17,14 @@ const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip"] as const;
 const text = (data: unknown) => ({ content: [{ type: "text" as const, text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] });
 const fail = (err: unknown) => ({ isError: true, content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }] });
 
-export function buildServer(client: CraftStoryClient): McpServer {
-  const server = new McpServer({ name: "craftstory", version: "0.3.0" });
+export interface ServerOptions {
+  /** Public base of the CraftStory API, for commands the model may run itself (hosted mode talks to an internal base). */
+  publicApiBase?: string;
+}
+
+export function buildServer(client: CraftStoryClient, options: ServerOptions = {}): McpServer {
+  const publicApiBase = (options.publicApiBase ?? "https://api.craftstory.com/api/v1").replace(/\/+$/, "");
+  const server = new McpServer({ name: "craftstory", version: "0.3.1" });
 
   server.registerTool(
     "list_models",
@@ -359,8 +365,10 @@ export function buildServer(client: CraftStoryClient): McpServer {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Use this when the user wants to use a photo that is not reachable by URL: a file attached to the chat, a picture on their phone or disk. " +
-        "Returns a one-time upload page link (valid 15 minutes). Show the COMPLETE upload_url to the user verbatim (never shorten or paraphrase it), ask them to open it and drop the photo, " +
-        "then call wait_for_upload (or get_upload after they say it is uploaded) to receive a file_url that create_* tools accept as image_url. Never invent an image URL.",
+        "Returns a one-time upload slot (valid 15 minutes). If the photo is a file you can read yourself (you can run shell commands and know its path), " +
+        "upload it yourself with the returned curl_command and then call get_upload - the user does not need to do anything. " +
+        "Otherwise show the COMPLETE upload_url to the user verbatim (never shorten or paraphrase it), ask them to open it and drop the photo, " +
+        "then call wait_for_upload (or get_upload after they say it is uploaded). Either way you get a file_url that create_* tools accept as image_url. Never invent an image URL.",
       inputSchema: {
         hint: z.string().max(200).optional().describe("What the photo is for, shown on the upload page, e.g. 'the jacket photo for the 10-second clip'"),
       },
@@ -368,9 +376,14 @@ export function buildServer(client: CraftStoryClient): McpServer {
     async ({ hint }) => {
       try {
         const link = await client.createUploadLink({ kind: "image", hint });
+        const token = link.upload_url.split("/").pop() ?? "";
+        const uploadEndpoint = `${publicApiBase}/uploads/by-token/${token}/`;
         return text({
           upload_id: link.id,
           upload_url: link.upload_url,
+          upload_endpoint: uploadEndpoint,
+          curl_command: `curl -sS -f -F "file=@/path/to/photo.jpg" "${uploadEndpoint}"`,
+          self_upload: "If you can read the photo file yourself, run curl_command with its path, then call get_upload. No account or token header is needed; the link is single-use.",
           expires_at: link.expires_at,
           message_for_user: `Open this link and drop the photo there:\n\n${link.upload_url}\n\nIt is valid for 15 minutes and takes one file (JPG/PNG/HEIC up to 20 MB). Tell me when it is uploaded.`,
           show_verbatim: "Paste upload_url in full; a shortened link cannot be opened.",
