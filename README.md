@@ -27,9 +27,9 @@ Standard MCP configuration, identical for every client (Claude Desktop, Cursor, 
 
 ## Install
 
-### claude.ai (web and mobile): hosted connector
+### claude.ai, Claude Desktop and mobile: hosted connector
 
-No key and nothing to install. In claude.ai open **Settings → Connectors → Add custom connector**, paste
+No key and nothing to install; connectors belong to your Claude account, so one setup covers web, desktop and mobile. In claude.ai open **Settings → Connectors → Add custom connector**, paste
 `https://mcp.craftstory.com/mcp`, open the advanced settings and set **OAuth Client ID** to
 `hAlwpyaDeO0CmuEKMibZxiXxtTT09NXL` (public, no secret), then sign in with your CraftStory account. The
 account needs a plan with API access (Producer). The hosted
