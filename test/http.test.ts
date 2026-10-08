@@ -178,3 +178,29 @@ test("local file paths are refused on the hosted server", async () => {
   assert.equal(result.result.isError, true);
   assert.match(result.result.content[0].text, /local file paths are not available/);
 });
+
+test("upload tools: request_file_upload returns the link, wait_for_upload returns file_url once uploaded", async () => {
+  const token = await mint();
+  const api = express();
+  api.use(express.json());
+  let polls = 0;
+  api.post("/api/v1/uploads/", (_req, res) => res.status(201).json({ id: "11111111-1111-4111-8111-111111111111", status: "pending", upload_url: "https://app.test/upload/tok", expires_at: "2026-10-08T17:00:00Z" }));
+  api.get("/api/v1/uploads/11111111-1111-4111-8111-111111111111/", (_req, res) => {
+    polls += 1;
+    res.json(polls < 2 ? { id: "1", status: "pending", expires_at: "x" } : { id: "1", status: "uploaded", file_url: "https://s3.test/u.jpg?sig", original_name: "me.jpg", expires_at: "x" });
+  });
+  const apiServer2 = await listen(api);
+  const mcp2 = await listen(createServer({ publicUrl: "https://mcp.test", issuer: ISSUER, jwksUrl: `${urlOf(authServer)}/.well-known/jwks.json`, audience: AUDIENCE, scopes: ["craftstory"], apiBase: `${urlOf(apiServer2)}/api/v1`, rateLimitPerMinute: 1000 }));
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const res = await fetch(`${urlOf(mcp2)}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: `Bearer ${token}` }, body: JSON.stringify({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name, arguments: args } }) });
+    return (await res.json()) as { result: { content: { text: string }[]; isError?: boolean } };
+  };
+  const link = await call("request_file_upload", { hint: "the jacket photo" });
+  assert.ok(!link.result.isError, JSON.stringify(link));
+  assert.match(link.result.content[0].text, /https:\/\/app\.test\/upload\/tok/);
+  const waited = await call("wait_for_upload", { upload_id: "11111111-1111-4111-8111-111111111111", timeout_s: 10 });
+  assert.match(waited.result.content[0].text, /"status": "uploaded"/);
+  assert.match(waited.result.content[0].text, /u\.jpg/);
+  apiServer2.close();
+  mcp2.close();
+});

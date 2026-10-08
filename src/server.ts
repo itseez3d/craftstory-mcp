@@ -18,7 +18,7 @@ const text = (data: unknown) => ({ content: [{ type: "text" as const, text: type
 const fail = (err: unknown) => ({ isError: true, content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }] });
 
 export function buildServer(client: CraftStoryClient): McpServer {
-  const server = new McpServer({ name: "craftstory", version: "0.2.0" });
+  const server = new McpServer({ name: "craftstory", version: "0.3.0" });
 
   server.registerTool(
     "list_models",
@@ -146,7 +146,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         "Credits are charged on create (see preview_cost) and refunded if the job fails. Returns the job id and initial status; generation takes 8-15 minutes, " +
         "so call wait_for_job(model='craftstory-2') repeatedly until it reports done, then get_job_result for the video URL.",
       inputSchema: {
-        image_url: z.string().url().optional().describe("Public URL of the photo (JPG/PNG)"),
+        image_url: z.string().url().optional().describe("Public URL of the photo (JPG/PNG), or the file_url from wait_for_upload / get_upload"),
         image_path: z.string().optional().describe("Absolute local path of the photo to upload (JPG/PNG/HEIC, <= 20 MB); ~/ is expanded"),
         scene_id: z.string().uuid().optional().describe("Custom avatar scene id (from list_avatars) used instead of a photo"),
         avatar_id: z.string().uuid().optional().describe("Custom avatar id (from list_avatars); its trained model drives identity"),
@@ -193,7 +193,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         "Output is ~1 MP at the chosen aspect_ratio (auto follows the photo). Cost 4.2 credits per billed second (basic and reference), charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
       inputSchema: {
         mode: z.enum(["basic", "reference"]),
-        image_url: z.string().url().optional(),
+        image_url: z.string().url().optional().describe("Public URL of the photo, or the file_url from wait_for_upload / get_upload"),
         image_path: z.string().optional(),
         user_prompt: z.string().optional().describe("Scene / motion description (required in basic mode)"),
         requested_duration_s: z.number().int().min(5).max(15).optional().describe("Clip length when there is no audio (basic mode, or reference mode without audio_clip_id); default 8"),
@@ -345,6 +345,82 @@ export function buildServer(client: CraftStoryClient): McpServer {
           const remaining = deadline - Date.now();
           if (remaining <= 0) return running();
           await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" ? 2000 : 5000, remaining)));
+        }
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "request_file_upload",
+    {
+      title: "Get a one-time link for the user to upload a photo",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      description:
+        "Use this when the user wants to use a photo that is not reachable by URL: a file attached to the chat, a picture on their phone or disk. " +
+        "Returns a one-time upload page link (valid 15 minutes). Show the link to the user, ask them to open it and drop the photo, " +
+        "then call wait_for_upload (or get_upload after they say it is uploaded) to receive a file_url that create_* tools accept as image_url. Never invent an image URL.",
+      inputSchema: {
+        hint: z.string().max(200).optional().describe("What the photo is for, shown on the upload page, e.g. 'the jacket photo for the 10-second clip'"),
+      },
+    },
+    async ({ hint }) => {
+      try {
+        const link = await client.createUploadLink({ kind: "image", hint });
+        return text({
+          upload_id: link.id,
+          upload_url: link.upload_url,
+          expires_at: link.expires_at,
+          message_for_user: `Open this link and drop the photo there: ${link.upload_url} (valid 15 minutes, one file, JPG/PNG/HEIC up to 20 MB). Tell me when it is uploaded.`,
+          next: "call wait_for_upload with upload_id; if it reports pending after the user says they uploaded, call get_upload",
+        });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_upload",
+    {
+      title: "Check an upload link (no waiting)",
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      description: "Status of a one-time upload link: pending, uploaded (with file_url to pass as image_url, valid about an hour) or expired.",
+      inputSchema: { upload_id: z.string().uuid() },
+    },
+    async ({ upload_id }) => {
+      try {
+        return text(await client.getUpload(upload_id));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "wait_for_upload",
+    {
+      title: "Wait for the user's upload (bounded polling)",
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      description:
+        "Polls an upload link for up to timeout_s (default 45, max 55) and returns as soon as the file is there (file_url) or the link expired. " +
+        "If it returns pending, do not loop: tell the user you are waiting, and call get_upload once they confirm the upload.",
+      inputSchema: {
+        upload_id: z.string().uuid(),
+        timeout_s: z.number().int().min(5).max(55).optional().describe("How long this call may wait (default 45, max 55)"),
+      },
+    },
+    async ({ upload_id, timeout_s }) => {
+      const deadline = Date.now() + (timeout_s ?? 45) * 1000;
+      try {
+        while (true) {
+          const budget = deadline - Date.now();
+          const info = await client.getUpload(upload_id, Math.min(15_000, Math.max(3_000, budget)));
+          if (info.status !== "pending" && info.status !== "uploading") return text(info);
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return text({ ...info, hint: "still pending - ask the user whether the upload is done, then call get_upload" });
+          await new Promise((r) => setTimeout(r, Math.min(3000, remaining)));
         }
       } catch (e) {
         return fail(e);

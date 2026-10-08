@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { basename } from "node:path";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.2.0";
+export const USER_AGENT = "craftstory-mcp/0.3.0";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
@@ -231,6 +231,14 @@ export class CraftStoryClient {
   }
   upscaleMiniMaxH3(id: string) {
     return this.post<Record<string, unknown>>(`/minimax-h3/${id}/upscale/`);
+  }
+
+  // ---- one-time upload links -------------------------------------------
+  createUploadLink(body: { kind: "image"; hint?: string }) {
+    return this.post<{ id: string; upload_url: string; expires_at: string; status: string }>("/uploads/", body);
+  }
+  getUpload(id: string, timeoutMs?: number) {
+    return this.get<{ id: string; status: string; file_url?: string | null; original_name?: string; size?: number; expires_at: string }>(`/uploads/${id}/`, timeoutMs);
   }
 
   // ---- generic job access ---------------------------------------------

@@ -34,7 +34,7 @@ No key and nothing to install; connectors belong to your Claude account, so one 
 `hAlwpyaDeO0CmuEKMibZxiXxtTT09NXL` (public, no secret), then sign in with your CraftStory account. The
 account needs a plan with API access (Producer). The hosted
 server speaks Streamable HTTP with OAuth 2.1 (Auth0) and runs the same tools as the package below; local
-file paths and chat attachments are not available there, pass public URLs instead.
+file paths and chat attachments are not available there: pass a public URL, or let Claude call `request_file_upload` and drop the photo on the one-time upload page it returns.
 
 ### Claude Code
 
@@ -67,6 +67,8 @@ Same shape in `~/.cursor/mcp.json` (user-level, so the key never lands in a repo
 Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (optional, default `https://api.craftstory.com/api/v1`; must be https unless `CRAFTSTORY_ALLOW_HTTP=1`).
 
 ## Tools
+
+Upload links (hosted mode and local alike): `request_file_upload` → one-time page for the user → `wait_for_upload` / `get_upload` → `file_url` for `image_url`.
 
 - `list_models`: Models, status (a paused model answers 503), limits and prices
 - `list_voices`: Library voices; `include_cloned` adds your cloned voices

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Upload links: `request_file_upload` gives the user a one-time page to drop a photo (15 minutes, one file);
+  `wait_for_upload` / `get_upload` return a `file_url` that the create tools accept as `image_url`.
+  Solves "attach a photo in claude.ai" for the hosted connector, where chat attachments never reach the server.
+
 ## 0.2.0
 
 - Hosted mode: `craftstory-mcp-http` serves the same tools over Streamable HTTP with OAuth 2.1 (Auth0), for
