@@ -117,6 +117,8 @@ export function createServer(opts: HttpServerOptions) {
     standardHeaders: "draft-8",
     legacyHeaders: false,
     keyGenerator: subOf,
+    // The limiter runs after bearer auth, so the key is the hashed token subject, never an IP.
+    validate: { keyGeneratorIpFallback: false },
     message: { jsonrpc: "2.0", error: { code: -32000, message: "Too many requests; slow down" }, id: null },
   });
 
