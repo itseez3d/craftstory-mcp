@@ -40,7 +40,7 @@ export async function fileOrUrl(input: { url?: string; path?: string }, field: s
   if (input.url && input.path) throw new Error(`${field}: pass either a URL or a local path, not both`);
   if (input.url) return { url: input.url };
   if (input.path && !allowLocalFiles) {
-    throw new Error(`${field}: local file paths are not available on the hosted CraftStory connector; pass a public URL (or attach the file to the chat and give its URL)`);
+    throw new Error(`${field}: local file paths are not available on the hosted CraftStory connector. Call request_file_upload to get a one-time upload link for the user, then pass the file_url from wait_for_upload / get_upload as the URL`);
   }
   if (input.path) {
     const path = input.path.startsWith("~/") ? homedir() + input.path.slice(1) : input.path;

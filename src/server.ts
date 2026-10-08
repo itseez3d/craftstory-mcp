@@ -359,7 +359,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Use this when the user wants to use a photo that is not reachable by URL: a file attached to the chat, a picture on their phone or disk. " +
-        "Returns a one-time upload page link (valid 15 minutes). Show the link to the user, ask them to open it and drop the photo, " +
+        "Returns a one-time upload page link (valid 15 minutes). Show the COMPLETE upload_url to the user verbatim (never shorten or paraphrase it), ask them to open it and drop the photo, " +
         "then call wait_for_upload (or get_upload after they say it is uploaded) to receive a file_url that create_* tools accept as image_url. Never invent an image URL.",
       inputSchema: {
         hint: z.string().max(200).optional().describe("What the photo is for, shown on the upload page, e.g. 'the jacket photo for the 10-second clip'"),
@@ -372,7 +372,8 @@ export function buildServer(client: CraftStoryClient): McpServer {
           upload_id: link.id,
           upload_url: link.upload_url,
           expires_at: link.expires_at,
-          message_for_user: `Open this link and drop the photo there: ${link.upload_url} (valid 15 minutes, one file, JPG/PNG/HEIC up to 20 MB). Tell me when it is uploaded.`,
+          message_for_user: `Open this link and drop the photo there:\n\n${link.upload_url}\n\nIt is valid for 15 minutes and takes one file (JPG/PNG/HEIC up to 20 MB). Tell me when it is uploaded.`,
+          show_verbatim: "Paste upload_url in full; a shortened link cannot be opened.",
           next: "call wait_for_upload with upload_id; if it reports pending after the user says they uploaded, call get_upload",
         });
       } catch (e) {
