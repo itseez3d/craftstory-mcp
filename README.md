@@ -34,7 +34,7 @@ No key and nothing to install; connectors belong to your Claude account, so one 
 `hAlwpyaDeO0CmuEKMibZxiXxtTT09NXL` (public, no secret), then sign in with your CraftStory account. The
 account needs a plan with API access (Producer). The hosted
 server speaks Streamable HTTP with OAuth 2.1 (Auth0) and runs the same tools as the package below; local
-file paths are not available there, pass public URLs instead.
+file paths and chat attachments are not available there, pass public URLs instead.
 
 ### Claude Code
 
