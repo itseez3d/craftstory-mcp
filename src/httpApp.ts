@@ -110,7 +110,7 @@ export function createServer(opts: HttpServerOptions) {
     next();
   });
 
-  const bearer = requireBearerAuth({ verifier: makeVerifier(opts), resourceMetadataUrl });
+  const bearer = requireBearerAuth({ verifier: makeVerifier(opts), resourceMetadataUrl, requiredScopes: opts.scopes });
   const limiter = rateLimit({
     windowMs: 60_000,
     limit: opts.rateLimitPerMinute ?? 60,
@@ -148,6 +148,14 @@ export function createServer(opts: HttpServerOptions) {
   // No server-initiated streams and no sessions in stateless mode.
   app.all("/mcp", (_req, res) => {
     res.set("Allow", "POST, OPTIONS").status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null });
+  });
+
+  // Malformed JSON or an oversized body: a JSON-RPC error instead of Express's HTML page.
+  app.use((err: Error & { status?: number; type?: string }, _req: Request, res: Response, _next: express.NextFunction) => {
+    const status = err.status ?? 500;
+    const message = status === 413 ? "Request body too large" : status === 400 ? "Malformed JSON body" : "Internal error";
+    if (status >= 500) console.error(JSON.stringify({ msg: "unhandled error", error: err.message }));
+    if (!res.headersSent) res.status(status).json({ jsonrpc: "2.0", error: { code: status >= 500 ? -32603 : -32700, message }, id: null });
   });
 
   return app;

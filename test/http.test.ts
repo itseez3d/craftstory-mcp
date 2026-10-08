@@ -19,8 +19,8 @@ let mcpServer: Server;
 let mcpUrl: string;
 const apiCalls: { path: string; authorization?: string }[] = [];
 
-async function mint(opts: { aud?: string; iss?: string; key?: KeyLike; exp?: string; sub?: string } = {}) {
-  return new SignJWT({ scope: "craftstory", azp: "client-1" })
+async function mint(opts: { aud?: string; iss?: string; key?: KeyLike; exp?: string; sub?: string; scope?: string } = {}) {
+  return new SignJWT({ scope: opts.scope ?? "craftstory offline_access", azp: "client-1" })
     .setProtectedHeader({ alg: "RS256", kid: "k1" })
     .setIssuer(opts.iss ?? ISSUER)
     .setAudience(opts.aud ?? AUDIENCE)
@@ -115,6 +115,21 @@ test("wrong audience, wrong issuer, foreign key and expired tokens are rejected"
     const res = await rpc(INIT, { Authorization: `Bearer ${token}` });
     assert.equal(res.status, 401);
   }
+});
+
+test("a token without the craftstory scope gets 403 insufficient_scope", async () => {
+  const res = await rpc(INIT, { Authorization: `Bearer ${await mint({ scope: "offline_access" })}` });
+  assert.equal(res.status, 403);
+  assert.match(res.headers.get("www-authenticate") ?? "", /insufficient_scope/);
+});
+
+test("malformed JSON and OPTIONS preflight are handled", async () => {
+  const bad = await fetch(`${mcpUrl}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await mint()}` }, body: "{not json" });
+  assert.equal(bad.status, 400);
+  assert.equal(((await bad.json()) as { error: { code: number } }).error.code, -32700);
+  const pre = await fetch(`${mcpUrl}/mcp`, { method: "OPTIONS", headers: { Origin: "https://claude.ai" } });
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers.get("access-control-allow-origin"), "https://claude.ai");
 });
 
 test("GET and DELETE are not offered in stateless mode", async () => {
