@@ -190,7 +190,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. " +
         "mode='reference': the reference model. With audio_clip_id the clip is lip-synced to it (first 15 s billed) and user_prompt is optional. Without audio_clip_id, pass requested_duration_s and a user_prompt with the spoken line in quotes: the model voices it and generates the soundtrack. " +
         "Either way up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a second person, a product or a background consistent. " +
-        "Output is 768 px on the short side, orientation follows the photo. Cost 4.2 credits per billed second (basic and reference), charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
+        "Output is ~1 MP at the chosen aspect_ratio (auto follows the photo). Cost 4.2 credits per billed second (basic and reference), charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
       inputSchema: {
         mode: z.enum(["basic", "reference"]),
         image_url: z.string().url().optional(),
@@ -200,6 +200,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         audio_clip_id: z.string().uuid().optional().describe("Reference mode: the clip that drives the video; leave out to have the lines in user_prompt voiced"),
         reference_files: z.array(z.string()).optional().describe("Reference mode: local paths of extra reference images/videos/audio"),
         reference_captions: z.array(z.string()).optional().describe("One caption per reference file, same order"),
+        aspect_ratio: z.enum(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16", "9:21", "4:5"]).optional().describe("Output shape; auto (default) = the native ratio nearest to the photo (16:9 without one). 4:5 is rendered as 3:4 and center-cropped (848x1060) — the ad format"),
         name: z.string().optional(),
       },
     },
@@ -219,6 +220,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
           reference_files: a.reference_files,
           reference_captions: a.reference_captions,
           name: a.name,
+          aspect_ratio: a.aspect_ratio,
         });
         return text({ id: r.id, status: r.status, credits: r.credits, next: "wait_for_job(model='minimax-h3', id=...) until done (1-3 min), then get_job_result" });
       } catch (e) {
@@ -245,6 +247,7 @@ export function buildServer(client: CraftStoryClient): McpServer {
         requested_duration_s: z.number().int().min(5).max(14).optional(),
         reference_files: z.array(z.string()).max(3).optional().describe("Local paths of up to 3 extra reference images/audio (no video)"),
         reference_captions: z.array(z.string()).optional().describe("One caption per reference file, same order"),
+        aspect_ratio: z.enum(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16", "9:21", "4:5"]).optional().describe("Output shape; auto (default) = the native ratio nearest to the photo (16:9 without one). 4:5 is rendered as 3:4 and center-cropped (848x1060) — the ad format"),
         name: z.string().optional(),
       },
     },

@@ -160,8 +160,10 @@ export class CraftStoryClient {
     reference_files?: string[];
     reference_captions?: string[];
     name?: string;
+    aspect_ratio?: string;
   }) {
     const fd = new FormData();
+    if (args.aspect_ratio) fd.append("aspect_ratio", args.aspect_ratio);
     const img = await fileOrUrl(args.image, "image");
     if (img.url) fd.append("image", img.url);
     else fd.append("image", img.blob!, img.name);
@@ -191,8 +193,10 @@ export class CraftStoryClient {
     reference_files?: string[];
     reference_captions?: string[];
     name?: string;
+    aspect_ratio?: string;
   }) {
     const fd = new FormData();
+    if (args.aspect_ratio) fd.append("aspect_ratio", args.aspect_ratio);
     fd.append("avatar_id", args.avatar_id);
     if (args.scene_id) fd.append("scene_id", args.scene_id);
     fd.append("speech_text", args.speech_text);

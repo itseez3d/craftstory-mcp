@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 - 2026-10-08
+
+- `aspect_ratio` on `create_minimax_h3_video` and `create_minimax_h3_avatar_video`: auto, 21:9, 16:9, 4:3, 1:1, 3:4, 9:16, 9:21, or 4:5 (rendered as 3:4 and center-cropped for ads).
+
 ## 0.1.7 - 2026-10-07
 
 - Copy: tool texts say "custom avatar" instead of "LoRA avatar"; `list_avatars` rows now also carry `lora_status` / `h3_status` where the API provides them (an avatar is usable with minimax-h3 right after upload, with craftstory-2 once training finishes).
