@@ -256,7 +256,11 @@ export function classify(status: string): "done" | "failed" | "running" {
 }
 
 function describeError(status: number, body: unknown): string {
-  if (status === 401) return `401 Unauthorized: ${flatten(body)} (stdio: check CRAFTSTORY_API_KEY and that the plan includes API access; hosted connector: sign in again)`;
+  if (status === 401) {
+    // The API's own detail (e.g. the plan gate with a pricing link) is the message; add the generic hint only when there is none.
+    const detail = flatten(body);
+    return detail ? `401 Unauthorized: ${detail}` : "401 Unauthorized (stdio: check CRAFTSTORY_API_KEY and that the plan includes API access; hosted connector: sign in again)";
+  }
   if (status === 402 || (status === 400 && JSON.stringify(body).includes("Low credits"))) return `Low credits: ${flatten(body)}`;
   if (status === 503) return `503: the model is paused right now (see list_models); retry later`;
   return `HTTP ${status}: ${flatten(body)}`;
