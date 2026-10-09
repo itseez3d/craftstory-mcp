@@ -4,6 +4,7 @@
 
 - 4:5 portrait: `create_craftstory2_video` accepts `resolution: "768_960"` (billed as 720p, audio under
   30 minutes); `upscale_video` takes `1152_1440` for it.
+- `lipsync_mode` now defaults to `sync_so` on the server (as in the web app); pass `craftstory` for the built-in engine.
 
 ## 0.3.0
 

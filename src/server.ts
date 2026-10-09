@@ -160,7 +160,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
         audio_clip_ids: z.array(z.string().uuid()).min(1).describe("Audio clip ids (from create_audio_clip), played in order"),
         resolution: z.enum(RESOLUTIONS),
         gestures: z.enum(GESTURES).optional().describe("How much the avatar moves (default normal)"),
-        lipsync_mode: z.enum(LIPSYNC).optional().describe("craftstory (default) / sync_so (alternative engine) / empty (no lip-sync)"),
+        lipsync_mode: z.enum(LIPSYNC).optional().describe("sync_so (default, same price) / craftstory (built-in engine) / empty (no lip-sync)"),
         user_prompt: z.string().max(1000).optional().describe("Optional motion / scene hint"),
         faceswap: z.boolean().optional().describe("Identity pass on the result (default true; off for custom avatars)"),
         name: z.string().optional().describe("Label, used as the download file name"),
