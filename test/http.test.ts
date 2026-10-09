@@ -205,3 +205,44 @@ test("upload tools: request_file_upload returns the link, wait_for_upload return
   apiServer2.close();
   mcp2.close();
 });
+
+test("audio upload links feed create_audio_clip; the file is pulled by upload id and sent as multipart", async () => {
+  const token = await mint();
+  const api = express();
+  api.use(express.json());
+  const wav = Buffer.concat([Buffer.from("RIFF\x24\x00\x00\x00WAVEfmt "), Buffer.alloc(2000, 7)]);
+  let received: Buffer | null = null;
+  let receivedType = "";
+  api.get("/files/take1.wav", (_req, res) => res.type("audio/wav").send(wav));
+  api.post("/api/v1/uploads/", (req, res) => res.status(201).json({ id: "22222222-2222-4222-8222-222222222222", kind: req.body.kind, status: "pending", upload_url: "https://app.test/upload/tok2", expires_at: "x" }));
+  api.get("/api/v1/uploads/22222222-2222-4222-8222-222222222222/", (req, res) => {
+    const base = `http://${req.headers.host}`;
+    res.json({ id: "2", kind: "audio", status: "uploaded", file_url: `${base}/files/take1.wav`, original_name: "take1.wav", content_type: "audio/wav", size: wav.length, expires_at: "x" });
+  });
+  api.post("/api/v1/audio/clips/", express.raw({ type: "multipart/form-data", limit: "10mb" }), (req, res) => {
+    received = req.body as Buffer;
+    receivedType = String(req.headers["content-type"]);
+    res.status(201).json({ id: "33333333-3333-4333-8333-333333333333", status: "created" });
+  });
+  const apiServer3 = await listen(api);
+  const mcp3 = await listen(createServer({ publicUrl: "https://mcp.test", issuer: ISSUER, jwksUrl: `${urlOf(authServer)}/.well-known/jwks.json`, audience: AUDIENCE, scopes: ["craftstory"], apiBase: `${urlOf(apiServer3)}/api/v1`, rateLimitPerMinute: 1000 }));
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const res = await fetch(`${urlOf(mcp3)}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: `Bearer ${token}` }, body: JSON.stringify({ jsonrpc: "2.0", id: 10, method: "tools/call", params: { name, arguments: args } }) });
+    return (await res.json()) as { result: { content: { text: string }[]; isError?: boolean } };
+  };
+  const link = await call("request_file_upload", { kind: "audio", hint: "the voice memo" });
+  assert.ok(!link.result.isError, JSON.stringify(link));
+  assert.match(link.result.content[0].text, /"kind": "audio"/);
+  assert.match(link.result.content[0].text, /audio_upload_id/);
+  const clip = await call("create_audio_clip", { audio_upload_id: "22222222-2222-4222-8222-222222222222" });
+  assert.ok(!clip.result.isError, JSON.stringify(clip));
+  assert.match(clip.result.content[0].text, /33333333-3333-4333-8333-333333333333/);
+  assert.match(receivedType, /^multipart\/form-data/);
+  assert.ok(received && (received as Buffer).includes(Buffer.from('filename="take1.wav"')), "file part with the original name");
+  assert.ok(received && (received as Buffer).includes(wav), "the stored bytes were forwarded unchanged");
+  // both sources at once is refused before any network call
+  const both = await call("create_audio_clip", { audio_upload_id: "22222222-2222-4222-8222-222222222222", file_path: "/tmp/x.wav" });
+  assert.equal(both.result.isError, true);
+  apiServer3.close();
+  mcp3.close();
+});

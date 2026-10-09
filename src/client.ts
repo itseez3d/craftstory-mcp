@@ -2,17 +2,47 @@
  * Thin HTTP client for the CraftStory public API (https://api.craftstory.com/api/v1/docs/public/).
  * Every method maps 1:1 onto a documented endpoint; no business logic lives here.
  */
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { basename } from "node:path";
+import { createWriteStream, openAsBlob } from "node:fs";
+import { readFile, unlink } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.3.1";
+export const USER_AGENT = "craftstory-mcp/0.5.0";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
 export type ModelId = "craftstory-2" | "minimax-h3";
 export type JobKind = ModelId | "audio-clip";
+export type UploadKind = "image" | "audio" | "video";
+
+/** Largest file the server pulls from an upload link into a temp file (the API's own caps are lower for some uses). */
+export const MAX_UPLOAD_FETCH_BYTES = 100 * 1024 * 1024;
+const UPLOAD_FETCH_TIMEOUT_MS = 90_000;
+/** A multipart POST carrying up to 100 MB needs more than the usual 25 s. */
+const MEDIA_POST_TIMEOUT_MS = 120_000;
+
+export interface UploadInfo {
+  id: string;
+  kind?: UploadKind;
+  status: string;
+  file_url?: string | null;
+  original_name?: string;
+  content_type?: string;
+  size?: number;
+  expires_at: string;
+}
+
+/** A file pulled from an upload link onto local disk; call release() when done. */
+export interface FetchedUpload {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+  release: () => Promise<void>;
+}
 
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown, message: string) {
@@ -101,8 +131,56 @@ export class CraftStoryClient {
   get<T>(path: string, timeoutMs?: number) {
     return this.request<T>("GET", path, undefined, timeoutMs);
   }
-  post<T>(path: string, body?: FormData | Record<string, unknown>) {
-    return this.request<T>("POST", path, body);
+  post<T>(path: string, body?: FormData | Record<string, unknown>, timeoutMs?: number) {
+    return this.request<T>("POST", path, body, timeoutMs);
+  }
+
+  // ---- upload links as file sources -----------------------------------
+  /**
+   * Pull an uploaded file (by upload id, never by a caller-supplied URL) into a
+   * temp file, streaming with a byte cap. The read URL comes from our own API,
+   * is https, and redirects are refused, so there is nothing to spoof here.
+   */
+  async fetchUpload(uploadId: string, maxBytes = MAX_UPLOAD_FETCH_BYTES): Promise<FetchedUpload> {
+    const info = await this.getUpload(uploadId);
+    if (info.status !== "uploaded" || !info.file_url) {
+      throw new Error(`upload ${uploadId} is ${info.status}; it has to be uploaded first (wait_for_upload / get_upload)`);
+    }
+    if (!info.file_url.startsWith("https://") && process.env.CRAFTSTORY_ALLOW_HTTP !== "1") throw new Error(`upload ${uploadId}: unexpected file URL`);
+    if (info.size && info.size > maxBytes) throw new Error(`upload ${uploadId} is ${Math.round(info.size / 1024 / 1024)} MB; the limit here is ${Math.round(maxBytes / 1024 / 1024)} MB`);
+    const res = await this.fetchImpl(info.file_url, { redirect: "error", signal: AbortSignal.timeout(UPLOAD_FETCH_TIMEOUT_MS) });
+    if (!res.ok || !res.body) throw new Error(`upload ${uploadId}: could not read the stored file (HTTP ${res.status})`);
+    const path = join(tmpdir(), `craftstory-upload-${uploadId}-${process.pid}-${Date.now()}`);
+    const release = async () => {
+      await unlink(path).catch(() => undefined);
+    };
+    let size = 0;
+    const counter = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        size += chunk.byteLength;
+        if (size > maxBytes) controller.error(new Error(`upload ${uploadId} exceeds ${Math.round(maxBytes / 1024 / 1024)} MB`));
+        else controller.enqueue(chunk);
+      },
+    });
+    try {
+      await pipeline(Readable.fromWeb(res.body.pipeThrough(counter) as import("node:stream/web").ReadableStream), createWriteStream(path));
+    } catch (e) {
+      await release();
+      throw e;
+    }
+    const ext = info.content_type ? `.${(info.content_type.split("/")[1] ?? "bin").replace("mpeg", "mp3").replace("quicktime", "mov").replace("x-matroska", "mkv")}` : "";
+    return { path, name: info.original_name || `upload${ext}`, type: info.content_type ?? "application/octet-stream", size, release };
+  }
+
+  private async appendFetchedUploads(fd: FormData, field: string, uploadIds: string[], captions: string[], captionOffset: number) {
+    const fetched: FetchedUpload[] = [];
+    for (const [i, id] of uploadIds.entries()) {
+      const f = await this.fetchUpload(id);
+      fetched.push(f);
+      fd.append(field, await openAsBlob(f.path, { type: f.type }), f.name);
+      fd.append("reference_captions", captions[captionOffset + i] ?? "");
+    }
+    return fetched;
   }
 
   // ---- catalogue -------------------------------------------------------
@@ -130,7 +208,18 @@ export class CraftStoryClient {
     const fd = new FormData();
     const { blob, name } = await fileOrUrl({ path }, "file", this.allowLocalFiles);
     fd.append("file", blob!, name);
-    return this.post<{ id: string }>("/audio/clips/", fd);
+    return this.post<{ id: string }>("/audio/clips/", fd, MEDIA_POST_TIMEOUT_MS);
+  }
+  /** A recording the user dropped on an upload link (kind audio). */
+  async createAudioClipFromUpload(uploadId: string) {
+    const f = await this.fetchUpload(uploadId);
+    try {
+      const fd = new FormData();
+      fd.append("file", await openAsBlob(f.path, { type: f.type }), f.name);
+      return await this.post<{ id: string }>("/audio/clips/", fd, MEDIA_POST_TIMEOUT_MS);
+    } finally {
+      await f.release();
+    }
   }
 
   // ---- CraftStory 2.0 --------------------------------------------------
@@ -176,6 +265,7 @@ export class CraftStoryClient {
     requested_duration_s?: number;
     audios?: string[];
     reference_files?: string[];
+    reference_uploads?: string[];
     reference_captions?: string[];
     name?: string;
     aspect_ratio?: string;
@@ -200,7 +290,12 @@ export class CraftStoryClient {
       fd.append("reference_files", f.blob!, f.name);
       fd.append("reference_captions", captions[i] ?? "");
     }
-    return this.post<Record<string, unknown>>("/minimax-h3/reference/", fd);
+    const fetched = await this.appendFetchedUploads(fd, "reference_files", args.reference_uploads ?? [], captions, args.reference_files?.length ?? 0);
+    try {
+      return await this.post<Record<string, unknown>>("/minimax-h3/reference/", fd, MEDIA_POST_TIMEOUT_MS);
+    } finally {
+      await Promise.all(fetched.map((f) => f.release()));
+    }
   }
   async createMiniMaxH3Avatar(args: {
     avatar_id: string;
@@ -209,6 +304,7 @@ export class CraftStoryClient {
     user_prompt?: string;
     requested_duration_s?: number;
     reference_files?: string[];
+    reference_uploads?: string[];
     reference_captions?: string[];
     name?: string;
     aspect_ratio?: string;
@@ -227,18 +323,23 @@ export class CraftStoryClient {
       fd.append("reference_files", f.blob!, f.name);
       fd.append("reference_captions", captions[i] ?? "");
     }
-    return this.post<Record<string, unknown>>("/minimax-h3/avatar/", fd);
+    const fetched = await this.appendFetchedUploads(fd, "reference_files", args.reference_uploads ?? [], captions, args.reference_files?.length ?? 0);
+    try {
+      return await this.post<Record<string, unknown>>("/minimax-h3/avatar/", fd, MEDIA_POST_TIMEOUT_MS);
+    } finally {
+      await Promise.all(fetched.map((f) => f.release()));
+    }
   }
   upscaleMiniMaxH3(id: string) {
     return this.post<Record<string, unknown>>(`/minimax-h3/${id}/upscale/`);
   }
 
   // ---- one-time upload links -------------------------------------------
-  createUploadLink(body: { kind: "image"; hint?: string }) {
-    return this.post<{ id: string; upload_url: string; expires_at: string; status: string }>("/uploads/", body);
+  createUploadLink(body: { kind: UploadKind; hint?: string }) {
+    return this.post<{ id: string; kind: UploadKind; upload_url: string; expires_at: string; status: string }>("/uploads/", body);
   }
   getUpload(id: string, timeoutMs?: number) {
-    return this.get<{ id: string; status: string; file_url?: string | null; original_name?: string; size?: number; expires_at: string }>(`/uploads/${id}/`, timeoutMs);
+    return this.get<UploadInfo>(`/uploads/${id}/`, timeoutMs);
   }
 
   // ---- generic job access ---------------------------------------------

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Upload links take audio and video (100 MB): `request_file_upload(kind)`. `create_audio_clip` accepts
+  `audio_upload_id`; the MiniMax H3 tools accept `reference_upload_ids`. The server pulls the stored file
+  by upload id (never by a caller-supplied URL) into a temp file and sends it to the API as multipart.
+
 ## 0.4.0
 
 - 4:5 portrait: `create_craftstory2_video` accepts `resolution: "768_960"` (billed as 720p, audio under

@@ -96,20 +96,25 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "The soundtrack every video model takes as input. Either text (up to 2000 characters) plus exactly one voice (voice_id from list_voices, or voice_user_id for a cloned voice), " +
-        "or file_path to upload a local WAV/MP3/M4A recording. Returns the clip id; it is ready when wait_for_job(model='audio-clip') reports done (usually seconds). " +
+        "or a recording: file_path (local WAV/MP3/M4A) or audio_upload_id (a file the user dropped on an upload link from request_file_upload with kind='audio'). " +
+        "Returns the clip id; it is ready when wait_for_job(model='audio-clip') reports done (usually seconds). " +
         "Longer scripts: create several clips and pass all ids to create_craftstory2_video in order.",
       inputSchema: {
         text: z.string().max(2000).optional().describe("Script to synthesize (<= 2000 chars)"),
         voice_id: z.string().uuid().optional().describe("Library voice id (from list_voices)"),
         voice_user_id: z.string().uuid().optional().describe("Cloned voice id (from list_voices with include_cloned)"),
         file_path: z.string().optional().describe("Local path of a recording to upload instead of text"),
+        audio_upload_id: z.string().uuid().optional().describe("upload_id of an uploaded recording (request_file_upload kind='audio', up to 100 MB) instead of text"),
       },
     },
-    async ({ text: script, voice_id, voice_user_id, file_path }) => {
+    async ({ text: script, voice_id, voice_user_id, file_path, audio_upload_id }) => {
       try {
-        if (file_path && (script || voice_id || voice_user_id)) throw new Error("Pass either file_path or text + one voice, not both");
+        const source = [file_path, audio_upload_id].filter(Boolean).length;
+        if (source > 1) throw new Error("Pass either file_path or audio_upload_id, not both");
+        if (source && (script || voice_id || voice_user_id)) throw new Error("Pass either a recording (file_path / audio_upload_id) or text + one voice, not both");
+        if (audio_upload_id) return text(await client.createAudioClipFromUpload(audio_upload_id));
         if (file_path) return text(await client.createAudioClipFromFile(file_path));
-        if (!script) throw new Error("Pass text (with a voice) or file_path");
+        if (!script) throw new Error("Pass text (with a voice), file_path or audio_upload_id");
         if (voice_id && voice_user_id) throw new Error("Pass exactly one of voice_id or voice_user_id");
         if (!voice_id && !voice_user_id) throw new Error("Pass voice_id (library voice) or voice_user_id (cloned voice) with text");
         return text(await client.createAudioClipFromText(script, voice_id ? { voice_id } : { voice_user_id }));
@@ -196,7 +201,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       description:
         "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. " +
         "mode='reference': the reference model. With audio_clip_id the clip is lip-synced to it (first 15 s billed) and user_prompt is optional. Without audio_clip_id, pass requested_duration_s and a user_prompt with the spoken line in quotes: the model voices it and generates the soundtrack. " +
-        "Either way up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a second person, a product or a background consistent. " +
+        "Either way up to 8 extra image / 3 video / 2 audio references keep a second person, a product or a background consistent: reference_files (local paths) and/or reference_upload_ids (files the user dropped on upload links, any kind), with reference_captions in the same order (files first, then uploads). " +
         "Output is ~1 MP at the chosen aspect_ratio (auto follows the photo). Cost 4.2 credits per billed second (basic and reference), charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min).",
       inputSchema: {
         mode: z.enum(["basic", "reference"]),
@@ -206,7 +211,8 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
         requested_duration_s: z.number().int().min(5).max(15).optional().describe("Clip length when there is no audio (basic mode, or reference mode without audio_clip_id); default 8"),
         audio_clip_id: z.string().uuid().optional().describe("Reference mode: the clip that drives the video; leave out to have the lines in user_prompt voiced"),
         reference_files: z.array(z.string()).optional().describe("Reference mode: local paths of extra reference images/videos/audio"),
-        reference_captions: z.array(z.string()).optional().describe("One caption per reference file, same order"),
+        reference_upload_ids: z.array(z.string().uuid()).max(10).optional().describe("Reference mode: upload_ids of extra references the user uploaded via request_file_upload (image/audio/video)"),
+        reference_captions: z.array(z.string()).optional().describe("One caption per reference, same order: reference_files first, then reference_upload_ids"),
         aspect_ratio: z.enum(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16", "9:21", "4:5"]).optional().describe("Output shape; auto (default) = the native ratio nearest to the photo (16:9 without one). 4:5 is rendered as 3:4 and center-cropped (848x1060) — the ad format"),
         name: z.string().optional(),
       },
@@ -225,6 +231,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
           requested_duration_s: a.requested_duration_s,
           audios: a.audio_clip_id ? [a.audio_clip_id] : undefined,
           reference_files: a.reference_files,
+          reference_uploads: a.reference_upload_ids,
           reference_captions: a.reference_captions,
           name: a.name,
           aspect_ratio: a.aspect_ratio,
@@ -244,7 +251,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       description:
         "Avatar mode of minimax-h3: a custom avatar from list_avatars (its `models` must include 'minimax-h3'; sample actors are not accepted) says speech_text verbatim in its own voice, inside one of its scenes (scene_id, default the first; see list_avatars with avatar_id). " +
         "No photo and no audio clip are sent: the avatar's training video teaches the model the face, voice and manner. user_prompt describes the scene and manner. " +
-        "5-14 s: pass requested_duration_s or let the length follow the text (about 15 characters per second). Up to 3 extra reference_files, images or audio, no video; extra photos lower the ceiling (0-1: 14 s, 2: 12 s, 3: 10 s). " +
+        "5-14 s: pass requested_duration_s or let the length follow the text (about 15 characters per second). Up to 3 extra references (reference_files local paths and/or reference_upload_ids from request_file_upload), images or audio, no video; extra photos lower the ceiling (0-1: 14 s, 2: 12 s, 3: 10 s). " +
         "The first run of an avatar builds its profile (about a minute more); later runs reuse it. Cost 5.6 credits per second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (10-25 min).",
       inputSchema: {
         avatar_id: z.string().uuid(),
@@ -253,14 +260,15 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
         user_prompt: z.string().optional().describe("Scene and manner, e.g. 'Selfie video, shows the product to the camera'"),
         requested_duration_s: z.number().int().min(5).max(14).optional(),
         reference_files: z.array(z.string()).max(3).optional().describe("Local paths of up to 3 extra reference images/audio (no video)"),
-        reference_captions: z.array(z.string()).optional().describe("One caption per reference file, same order"),
+        reference_upload_ids: z.array(z.string().uuid()).max(3).optional().describe("upload_ids of extra reference images/audio the user uploaded (no video)"),
+        reference_captions: z.array(z.string()).optional().describe("One caption per reference, same order: reference_files first, then reference_upload_ids"),
         aspect_ratio: z.enum(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16", "9:21", "4:5"]).optional().describe("Output shape; auto (default) = the native ratio nearest to the photo (16:9 without one). 4:5 is rendered as 3:4 and center-cropped (848x1060) — the ad format"),
         name: z.string().optional(),
       },
     },
     async (a) => {
       try {
-        const r = await client.createMiniMaxH3Avatar(a);
+        const r = await client.createMiniMaxH3Avatar({ ...a, reference_uploads: a.reference_upload_ids });
         return text({ id: r.id, status: r.status, credits: r.credits, next: "wait_for_job(model='minimax-h3', id=...) until done (10-25 min), then get_job_result" });
       } catch (e) {
         return fail(e);
@@ -362,32 +370,43 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
   server.registerTool(
     "request_file_upload",
     {
-      title: "Get a one-time link for the user to upload a photo",
+      title: "Get a one-time link for the user to upload a photo, audio or video file",
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
-        "Use this when the user wants to use a photo that is not reachable by URL: a file attached to the chat, a picture on their phone or disk. " +
-        "Returns a one-time upload slot (valid 15 minutes). If the photo is a file you can read yourself (you can run shell commands and know its path), " +
+        "Use this when the user wants to use a file that is not reachable by URL: a photo, recording or video attached to the chat or on their phone or disk. " +
+        "kind: image (JPG/PNG/HEIC, 20 MB; use the file_url as image_url), audio (MP3/WAV/M4A/OGG/FLAC, 100 MB; pass upload_id as audio_upload_id to create_audio_clip or in reference_upload_ids), " +
+        "video (MP4/MOV/WebM/MKV, 100 MB; pass upload_id in reference_upload_ids of create_minimax_h3_video). " +
+        "Returns a one-time upload slot (valid 15 minutes). If the file is one you can read yourself (you can run shell commands and know its path), " +
         "upload it yourself with the returned curl_command and then call get_upload - the user does not need to do anything. " +
-        "Otherwise show the COMPLETE upload_url to the user verbatim (never shorten or paraphrase it), ask them to open it and drop the photo, " +
-        "then call wait_for_upload (or get_upload after they say it is uploaded). Either way you get a file_url that create_* tools accept as image_url. Never invent an image URL.",
+        "Otherwise show the COMPLETE upload_url to the user verbatim (never shorten or paraphrase it), ask them to open it and drop the file, " +
+        "then call wait_for_upload (or get_upload after they say it is uploaded). Never invent a file URL.",
       inputSchema: {
-        hint: z.string().max(200).optional().describe("What the photo is for, shown on the upload page, e.g. 'the jacket photo for the 10-second clip'"),
+        kind: z.enum(["image", "audio", "video"]).optional().describe("What the user will upload (default image)"),
+        hint: z.string().max(200).optional().describe("What the file is for, shown on the upload page, e.g. 'the jacket photo for the 10-second clip'"),
       },
     },
-    async ({ hint }) => {
+    async ({ kind, hint }) => {
       try {
-        const link = await client.createUploadLink({ kind: "image", hint });
+        const k = kind ?? "image";
+        const link = await client.createUploadLink({ kind: k, hint });
         const token = link.upload_url.split("/").pop() ?? "";
         const uploadEndpoint = `${publicApiBase}/uploads/by-token/${token}/`;
+        const spec = {
+          image: { noun: "photo", formats: "JPG/PNG/HEIC up to 20 MB", example: "/path/to/photo.jpg", use: "pass file_url from get_upload as image_url" },
+          audio: { noun: "audio file", formats: "MP3/WAV/M4A/OGG/FLAC up to 100 MB", example: "/path/to/recording.mp3", use: "pass upload_id as audio_upload_id to create_audio_clip (or in reference_upload_ids)" },
+          video: { noun: "video", formats: "MP4/MOV/WebM/MKV up to 100 MB", example: "/path/to/clip.mp4", use: "pass upload_id in reference_upload_ids of create_minimax_h3_video" },
+        }[k];
         return text({
           upload_id: link.id,
+          kind: k,
           upload_url: link.upload_url,
           upload_endpoint: uploadEndpoint,
-          curl_command: `curl -sS -f -F "file=@/path/to/photo.jpg" "${uploadEndpoint}"`,
-          self_upload: "If you can read the photo file yourself, run curl_command with its path, then call get_upload. No account or token header is needed; the link is single-use.",
+          curl_command: `curl -sS -f -F "file=@${spec.example}" "${uploadEndpoint}"`,
+          self_upload: `If you can read the ${spec.noun} yourself, run curl_command with its path, then call get_upload. No account or token header is needed; the link is single-use.`,
           expires_at: link.expires_at,
-          message_for_user: `Open this link and drop the photo there:\n\n${link.upload_url}\n\nIt is valid for 15 minutes and takes one file (JPG/PNG/HEIC up to 20 MB). Tell me when it is uploaded.`,
+          message_for_user: `Open this link and drop the ${spec.noun} there:\n\n${link.upload_url}\n\nIt is valid for 15 minutes and takes one file (${spec.formats}). Tell me when it is uploaded.`,
           show_verbatim: "Paste upload_url in full; a shortened link cannot be opened.",
+          then: spec.use,
           next: "call wait_for_upload with upload_id; if it reports pending after the user says they uploaded, call get_upload",
         });
       } catch (e) {
@@ -401,7 +420,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
     {
       title: "Check an upload link (no waiting)",
       annotations: { readOnlyHint: true, openWorldHint: true },
-      description: "Status of a one-time upload link: pending, uploaded (with file_url to pass as image_url, valid about an hour) or expired.",
+      description: "Status of a one-time upload link: pending, uploaded or expired. For images the file_url (valid about an hour) is what create_* tools take as image_url; audio and video uploads are referenced by upload_id (audio_upload_id, reference_upload_ids).",
       inputSchema: { upload_id: z.string().uuid() },
     },
     async ({ upload_id }) => {
@@ -419,7 +438,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       title: "Wait for the user's upload (bounded polling)",
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
-        "Polls an upload link for up to timeout_s (default 45, max 55) and returns as soon as the file is there (file_url) or the link expired. " +
+        "Polls an upload link for up to timeout_s (default 45, max 55) and returns as soon as the file is there or the link expired. " +
         "If it returns pending, do not loop: tell the user you are waiting, and call get_upload once they confirm the upload.",
       inputSchema: {
         upload_id: z.string().uuid(),
