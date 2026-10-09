@@ -68,7 +68,7 @@ Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (o
 
 ## Tools
 
-Upload links (hosted mode and local alike): `request_file_upload` → one-time page for the user → `wait_for_upload` / `get_upload` → `file_url` for `image_url`.
+Upload links (hosted mode and local alike): `request_file_upload(kind=image|audio|video)` → one-time page for the user → `wait_for_upload` / `get_upload`. Images: `file_url` goes into `image_url`. Audio: `upload_id` goes into `create_audio_clip(audio_upload_id)`. Audio/video: `upload_id` goes into `reference_upload_ids` of the MiniMax H3 tools. Limits: 20 MB for photos, 100 MB for audio and video.
 
 - `list_models`: Models, status (a paused model answers 503), limits and prices
 - `list_voices`: Library voices; `include_cloned` adds your cloned voices
