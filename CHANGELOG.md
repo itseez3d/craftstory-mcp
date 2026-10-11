@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- `create_craftstory2_video`: with `avatar_id` a photo is optional; without `scene_id` the avatar's first scene
+  is the frame, so an assistant no longer waits for an upload when the user named an avatar or a scene.
+
 ## 0.5.0
 
 - Upload links take audio and video (100 MB): `request_file_upload(kind)`. `create_audio_clip` accepts

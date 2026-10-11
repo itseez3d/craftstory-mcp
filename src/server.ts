@@ -154,6 +154,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Start a craftstory-2 generation: a photo of a person (image_url or image_path, or a custom avatar scene via scene_id) speaks the given audio clips with lip-sync, gestures and natural motion; any length. " +
+        "With avatar_id a photo is OPTIONAL: pass scene_id (from list_avatars with avatar_id) or omit both and the avatar's first scene is used. When the user names an avatar or a scene, do not ask for a photo. " +
         "resolution is WIDTH_HEIGHT (480_832 / 720_1280 portrait, 832_480 / 1280_720 landscape, 768_960 for 4:5 portrait billed as 720p, audio under 30 minutes); a 1.5x upscale is available afterwards via upscale_video. " +
         "Credits are charged on create (see preview_cost) and refunded if the job fails. Returns the job id and initial status; generation takes 8-15 minutes, " +
         "so call wait_for_job(model='craftstory-2') repeatedly until it reports done, then get_job_result for the video URL.",
@@ -173,7 +174,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
     },
     async (a) => {
       try {
-        if (!a.image_url && !a.image_path && !a.scene_id) throw new Error("Pass image_url, image_path or scene_id");
+        if (!a.image_url && !a.image_path && !a.scene_id && !a.avatar_id) throw new Error("Pass image_url, image_path, scene_id or avatar_id");
         const r = await client.createCraftStory2({
           image: { url: a.image_url, path: a.image_path },
           scene_id: a.scene_id,

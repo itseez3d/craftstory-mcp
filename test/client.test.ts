@@ -51,6 +51,25 @@ test("create_craftstory2 sends multipart with the public field names", async () 
   assert.equal(fd.get("scene_id"), null);
 });
 
+test("create_craftstory2 with an avatar and no photo uses the avatar's first scene", async () => {
+  const calls: Call[] = [];
+  let n = 0;
+  const fetchImpl: typeof fetch = async (url, init) => {
+    calls.push({ url: String(url), headers: (init?.headers ?? {}) as Record<string, string>, body: init?.body });
+    n += 1;
+    const body = n === 1 ? [{ id: "11111111-1111-4111-8111-111111111111", name: "mia-car-9x16-b" }, { id: "22222222-2222-4222-8222-222222222222" }] : { id: "j2", status: "created", credits: 60 };
+    return new Response(JSON.stringify(body), { status: n === 1 ? 200 : 201, headers: { "Content-Type": "application/json" } });
+  };
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl });
+  const r = await c.createCraftStory2({ avatar_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", audios: ["a1"], resolution: "768_960" });
+  assert.equal(r.id, "j2");
+  assert.equal(calls[0].url, "https://api.craftstory.com/api/v1/craftstory-2/avatars/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/scenes/");
+  const fd = calls[1].body as FormData;
+  assert.equal(fd.get("scene_id"), "11111111-1111-4111-8111-111111111111");
+  assert.equal(fd.get("avatar_id"), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  assert.equal(fd.get("image"), null);
+});
+
 test("minimax h3 routes basic and reference modes to their endpoints", async () => {
   const calls: Call[] = [];
   const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(201, { id: "h" }, calls) });

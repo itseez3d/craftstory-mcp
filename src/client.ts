@@ -10,7 +10,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.5.0";
+export const USER_AGENT = "craftstory-mcp/0.5.1";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
@@ -243,6 +243,12 @@ export class CraftStoryClient {
       const img = await fileOrUrl(args.image, "image", this.allowLocalFiles);
       if (img.url) fd.append("image", img.url);
       else fd.append("image", img.blob!, img.name);
+    } else if (!args.scene_id && args.avatar_id) {
+      // A custom avatar carries its own scenes: without a photo, the first one is the frame.
+      const scenes = (await this.listAvatarScenes(args.avatar_id)) as { id?: string }[];
+      const first = scenes.find((s) => s && s.id);
+      if (!first) throw new Error(`avatar ${args.avatar_id} has no scenes; pass image_url / image_path or scene_id`);
+      args = { ...args, scene_id: first.id };
     }
     for (const a of args.audios) fd.append("audios", a);
     fd.append("resolution", args.resolution);
