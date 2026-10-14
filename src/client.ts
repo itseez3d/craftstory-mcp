@@ -15,7 +15,7 @@ export const USER_AGENT = "craftstory-mcp/0.6.0";
 export const REQUEST_TIMEOUT_MS = 25_000;
 
 export type ModelId = "craftstory-2" | "minimax-h3";
-export type JobKind = ModelId | "audio-clip" | "image" | "music";
+export type JobKind = ModelId | "audio-clip" | "image" | "music" | "sound-effect";
 export type UploadKind = "image" | "audio" | "video";
 
 /** Largest file the server pulls from an upload link into a temp file (the API's own caps are lower for some uses). */
@@ -373,6 +373,9 @@ export class CraftStoryClient {
   createMusic(body: { prompt: string; duration_s?: number; instrumental?: boolean }) {
     return this.post<Record<string, unknown>>("/music/", body);
   }
+  createSoundEffect(body: { prompt: string; duration_s?: number; loop?: boolean; prompt_influence?: number }) {
+    return this.post<Record<string, unknown>>("/sound-effects/", body);
+  }
 
   upscaleMiniMaxH3(id: string) {
     return this.post<Record<string, unknown>>(`/minimax-h3/${id}/upscale/`);
@@ -388,7 +391,7 @@ export class CraftStoryClient {
 
   // ---- generic job access ---------------------------------------------
   jobPath(kind: JobKind, id: string) {
-    const base = { "audio-clip": "/audio/clips", image: "/images", music: "/music" }[kind as string] ?? `/${kind}`;
+    const base = { "audio-clip": "/audio/clips", image: "/images", music: "/music", "sound-effect": "/sound-effects" }[kind as string] ?? `/${kind}`;
     return `${base}/${id}/`;
   }
   getStatus(kind: JobKind, id: string, timeoutMs?: number) {

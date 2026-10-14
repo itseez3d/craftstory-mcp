@@ -13,7 +13,7 @@ const RESOLUTIONS = ["480_832", "832_480", "720_1280", "1280_720", "768_960"] as
 const UPSCALE_RESOLUTIONS = ["1080_1920", "1920_1080", "1152_1440"] as const;
 const GESTURES = ["normal", "calm", "expressive"] as const;
 const LIPSYNC = ["craftstory", "sync_so", "empty"] as const;
-const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip", "image", "music"] as const;
+const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip", "image", "music", "sound-effect"] as const;
 const IMAGE_ASPECTS = ["9:16", "16:9", "4:5", "1:1", "3:4", "4:3"] as const;
 
 const text = (data: unknown) => ({ content: [{ type: "text" as const, text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] });
@@ -336,6 +336,33 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
   );
 
   server.registerTool(
+    "create_sound_effect",
+    {
+      title: "Create a sound effect or ambience (0.5-30 s)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      description:
+        "Generate a sound effect from a description of what makes the sound, where and how close: footsteps on gravel, a door, a whoosh for a transition, rain, a busy cafe. " +
+        "duration_s 0.5-30, or leave it out and the model picks a length that suits the sound. loop=true makes an ambience that repeats seamlessly under a long video. " +
+        "prompt_influence 0-1: higher follows the prompt more literally. Cost 1 credit per started 5 seconds, 2 at least, charged on create, refunded on failure. " +
+        "Returns the job id; wait_for_job(model='sound-effect') is usually done in a few seconds, the result has audio_url (MP3). If the call answers 503, sound effects are switched off for now.",
+      inputSchema: {
+        prompt: z.string().min(1).max(1000).describe("What makes the sound, where, how close"),
+        duration_s: z.number().min(0.5).max(30).optional().describe("Length in seconds; omit to let the model pick"),
+        loop: z.boolean().optional().describe("Seamless loop for ambience (default false)"),
+        prompt_influence: z.number().min(0).max(1).optional().describe("0-1, higher = more literal"),
+      },
+    },
+    async (a) => {
+      try {
+        const r = await client.createSoundEffect(a);
+        return text({ id: r.id, status: r.status, duration_s: r.duration_s, credits: r.credits, next: "wait_for_job(model='sound-effect', id=...) - usually a few seconds; the result has audio_url" });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "get_job_status",
     {
       title: "Get a job's status",
@@ -360,7 +387,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       title: "Get a finished job (video URL and details)",
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
-        "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`, for images in `image_url` (PNG), for music in `audio_url` (MP3); all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
+        "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`, for images in `image_url` (PNG), for music and sound effects in `audio_url` (MP3); all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
       inputSchema: { model: z.enum(JOB_KINDS), id: z.string().uuid() },
     },
     async ({ model, id }) => {
@@ -379,7 +406,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. " +
-        "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, images 10-25 seconds, music about as long as the track, audio clips seconds. Reports progress notifications when the client supports them.",
+        "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, images 10-25 seconds, sound effects a few seconds, music about as long as the track, audio clips seconds. Reports progress notifications when the client supports them.",
       inputSchema: {
         model: z.enum(JOB_KINDS),
         id: z.string().uuid(),
@@ -419,7 +446,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
           }
           const remaining = deadline - Date.now();
           if (remaining <= 0) return running();
-          await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" || model === "image" ? 2000 : 5000, remaining)));
+          await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" || model === "image" || model === "sound-effect" ? 2000 : 5000, remaining)));
         }
       } catch (e) {
         return fail(e);

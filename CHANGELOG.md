@@ -5,7 +5,8 @@
 - `create_image`: Nano Banana / Nano Banana Pro images from a prompt and up to 8 source pictures
   (URLs, local files, or image upload ids), with `aspect_ratio` 9:16, 16:9, 4:5, 1:1, 3:4 or 4:3.
 - `create_music`: ElevenLabs music tracks of 5-180 s, instrumental by default.
-- `wait_for_job`, `get_job_status`, `get_job_result` take `model: "image" | "music"`; a music prompt declined
+- `create_sound_effect`: ElevenLabs sound effects and ambience of 0.5-30 s (or auto length), optional seamless loop.
+- `wait_for_job`, `get_job_status`, `get_job_result` take `model: "image" | "music" | "sound-effect"`; a music prompt declined
   for naming an artist or a song returns the provider's `prompt_suggestion` right away.
 - A 503 now carries the API's own reason (for example, music switched off) instead of a generic "paused".
 

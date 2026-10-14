@@ -172,3 +172,13 @@ test("503 carries the API's own reason", async () => {
   const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(503, { detail: "Music generation is temporarily unavailable" }, []) });
   await assert.rejects(c.createMusic({ prompt: "x" }), /Music generation is temporarily unavailable/);
 });
+
+test("create_sound_effect posts JSON and polls /sound-effects/", async () => {
+  const calls: Call[] = [];
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(201, { id: "s1", status: "created", credits: 2 }, calls) });
+  await c.createSoundEffect({ prompt: "door creak", loop: false });
+  assert.equal(calls[0].url, "https://api.craftstory.com/api/v1/sound-effects/");
+  assert.deepEqual(JSON.parse(String(calls[0].body)), { prompt: "door creak", loop: false });
+  await c.getStatus("sound-effect", "s1");
+  assert.equal(calls[1].url, "https://api.craftstory.com/api/v1/sound-effects/s1/status/");
+});

@@ -83,6 +83,7 @@ Upload links (hosted mode and local alike): `request_file_upload(kind=image|audi
 - `upscale_video`: New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 2x)
 - `create_image`: Nano Banana image from a prompt, optionally from up to 8 of your pictures; `aspect_ratio` 9:16, 16:9, 4:5, 1:1, 3:4, 4:3 (13 credits, 25 with `nano-banana-pro`). The result's `image_url` goes straight into the video tools
 - `create_music`: Music track of 5-180 s from a description, instrumental by default (1 credit per second); a declined prompt comes back with `prompt_suggestion`
+- `create_sound_effect`: Sound effect or ambience of 0.5-30 s (or auto length), optional seamless loop (1 credit per started 5 s, 2 minimum)
 
 Plus the prompt `talking_video_from_photo` (script + photo) that walks the model through the whole flow.
 
