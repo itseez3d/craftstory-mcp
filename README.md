@@ -68,7 +68,7 @@ Environment variables: `CRAFTSTORY_API_KEY` (required), `CRAFTSTORY_API_BASE` (o
 
 ## Tools
 
-Upload links (hosted mode and local alike): `request_file_upload(kind=image|audio|video)` → one-time page for the user → `wait_for_upload` / `get_upload`. Images: `file_url` goes into `image_url`. Audio: `upload_id` goes into `create_audio_clip(audio_upload_id)`. Audio/video: `upload_id` goes into `reference_upload_ids` of the MiniMax H3 tools. Limits: 20 MB for photos, 100 MB for audio and video.
+Upload links (hosted mode and local alike): `request_file_upload(kind=image|audio|video)` → one-time page for the user → `wait_for_upload` / `get_upload`. Images: `file_url` goes into `image_url`, or the `upload_id` into `create_image(image_upload_ids)`. Audio: `upload_id` goes into `create_audio_clip(audio_upload_id)`. Audio/video: `upload_id` goes into `reference_upload_ids` of the MiniMax H3 tools. Limits: 20 MB for photos, 100 MB for audio and video.
 
 - `list_models`: Models, status (a paused model answers 503), limits and prices
 - `list_voices`: Library voices; `include_cloned` adds your cloned voices
@@ -81,6 +81,8 @@ Upload links (hosted mode and local alike): `request_file_upload(kind=image|audi
 - `get_job_result`: Full record with the signed video URL (valid 7 days)
 - `wait_for_job`: Bounded polling (default 45 s, max 55 s); call again while `state` is `running`
 - `upscale_video`: New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 2x)
+- `create_image`: Nano Banana image from a prompt, optionally from up to 8 of your pictures; `aspect_ratio` 9:16, 16:9, 4:5, 1:1, 3:4, 4:3 (13 credits, 25 with `nano-banana-pro`). The result's `image_url` goes straight into the video tools
+- `create_music`: Music track of 5-180 s from a description, instrumental by default (1 credit per second); a declined prompt comes back with `prompt_suggestion`
 
 Plus the prompt `talking_video_from_photo` (script + photo) that walks the model through the whole flow.
 

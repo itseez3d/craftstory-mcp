@@ -10,12 +10,12 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 export const DEFAULT_BASE = "https://api.craftstory.com/api/v1";
-export const USER_AGENT = "craftstory-mcp/0.5.1";
+export const USER_AGENT = "craftstory-mcp/0.6.0";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
 export type ModelId = "craftstory-2" | "minimax-h3";
-export type JobKind = ModelId | "audio-clip";
+export type JobKind = ModelId | "audio-clip" | "image" | "music";
 export type UploadKind = "image" | "audio" | "video";
 
 /** Largest file the server pulls from an upload link into a temp file (the API's own caps are lower for some uses). */
@@ -336,6 +336,44 @@ export class CraftStoryClient {
       await Promise.all(fetched.map((f) => f.release()));
     }
   }
+  // ---- images and music ------------------------------------------------
+  /**
+   * POST /images/: prompt, optional source pictures (URLs, local files, or
+   * image uploads by id, whose stored file URL the API fetches itself).
+   * JSON when every picture is a URL, multipart as soon as one is a file.
+   */
+  async createImage(args: {
+    prompt: string;
+    model?: string;
+    aspect_ratio?: string;
+    image_urls?: string[];
+    image_paths?: string[];
+    image_upload_ids?: string[];
+  }) {
+    const urls = [...(args.image_urls ?? [])];
+    for (const id of args.image_upload_ids ?? []) {
+      const info = await this.getUpload(id);
+      if (info.status !== "uploaded" || !info.file_url) throw new Error(`upload ${id} is ${info.status}; it has to be uploaded first (wait_for_upload / get_upload)`);
+      if (info.kind && info.kind !== "image") throw new Error(`upload ${id} is ${info.kind}, not an image`);
+      urls.push(info.file_url);
+    }
+    const fields: Record<string, string> = { prompt: args.prompt };
+    if (args.model) fields.model = args.model;
+    if (args.aspect_ratio) fields.aspect_ratio = args.aspect_ratio;
+    if (!args.image_paths?.length) return this.post<Record<string, unknown>>("/images/", { ...fields, images: urls });
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+    for (const u of urls) fd.append("images", u);
+    for (const p of args.image_paths) {
+      const f = await fileOrUrl({ path: p }, "image_paths", this.allowLocalFiles);
+      fd.append("images", f.blob!, f.name);
+    }
+    return this.post<Record<string, unknown>>("/images/", fd, MEDIA_POST_TIMEOUT_MS);
+  }
+  createMusic(body: { prompt: string; duration_s?: number; instrumental?: boolean }) {
+    return this.post<Record<string, unknown>>("/music/", body);
+  }
+
   upscaleMiniMaxH3(id: string) {
     return this.post<Record<string, unknown>>(`/minimax-h3/${id}/upscale/`);
   }
@@ -350,7 +388,8 @@ export class CraftStoryClient {
 
   // ---- generic job access ---------------------------------------------
   jobPath(kind: JobKind, id: string) {
-    return kind === "audio-clip" ? `/audio/clips/${id}/` : `/${kind}/${id}/`;
+    const base = { "audio-clip": "/audio/clips", image: "/images", music: "/music" }[kind as string] ?? `/${kind}`;
+    return `${base}/${id}/`;
   }
   getStatus(kind: JobKind, id: string, timeoutMs?: number) {
     return this.get<{ status: string; status_percentage?: number; status_failed?: string | null; credits_refunded?: unknown }>(
@@ -377,7 +416,7 @@ function describeError(status: number, body: unknown): string {
     return detail ? `401 Unauthorized: ${detail}` : "401 Unauthorized (stdio: check CRAFTSTORY_API_KEY and that the plan includes API access; hosted connector: sign in again)";
   }
   if (status === 402 || (status === 400 && JSON.stringify(body).includes("Low credits"))) return `Low credits: ${flatten(body)}`;
-  if (status === 503) return `503: the model is paused right now (see list_models); retry later`;
+  if (status === 503) return `503: ${flatten(body) || "the model is paused right now (see list_models)"}; retry later`;
   return `HTTP ${status}: ${flatten(body)}`;
 }
 

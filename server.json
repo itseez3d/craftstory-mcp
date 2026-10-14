@@ -2,18 +2,18 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.itseez3d/craftstory-mcp",
   "title": "CraftStory",
-  "description": "Talking-avatar videos from a photo (CraftStory 2.0) and short clips with sound (MiniMax H3).",
+  "description": "Talking-avatar videos from a photo, short clips with sound, images and music.",
   "repository": {
     "url": "https://github.com/itseez3d/craftstory-mcp",
     "source": "github"
   },
   "websiteUrl": "https://craftstory.com/mcp/",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@craftstory/mcp",
-      "version": "0.5.1",
+      "version": "0.6.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -124,3 +124,51 @@ test("~/ in a local path expands to the home directory", async () => {
   const { fileOrUrl } = await import("../src/client.js");
   await assert.rejects(fileOrUrl({ path: "~/definitely-missing-craftstory-mcp.jpg" }, "image"), (e: NodeJS.ErrnoException) => e.code === "ENOENT" && !e.message.includes("~/"));
 });
+
+test("create_image sends JSON when every source is a URL, upload ids become their file URLs", async () => {
+  const calls: Call[] = [];
+  let n = 0;
+  const fetchImpl: typeof fetch = async (url, init) => {
+    calls.push({ url: String(url), method: init?.method ?? "GET", headers: (init?.headers ?? {}) as Record<string, string>, body: init?.body });
+    n += 1;
+    const body = n === 1
+      ? { id: "u1", kind: "image", status: "uploaded", file_url: "https://bucket.s3.amazonaws.com/u1.png", expires_at: "" }
+      : { id: "i1", status: "created", model: "nano-banana-pro", aspect_ratio: "4:5", credits: 25 };
+    return new Response(JSON.stringify(body), { status: n === 1 ? 200 : 201, headers: { "Content-Type": "application/json" } });
+  };
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl });
+  const r = await c.createImage({ prompt: "on a bench", model: "nano-banana-pro", aspect_ratio: "4:5", image_urls: ["https://x/a.png"], image_upload_ids: ["u1"] });
+  assert.equal(r.id, "i1");
+  assert.equal(calls[1].url, "https://api.craftstory.com/api/v1/images/");
+  assert.equal(calls[1].headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(String(calls[1].body)), {
+    prompt: "on a bench", model: "nano-banana-pro", aspect_ratio: "4:5", images: ["https://x/a.png", "https://bucket.s3.amazonaws.com/u1.png"],
+  });
+});
+
+test("create_image refuses an upload that is not there yet", async () => {
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(200, { id: "u1", kind: "image", status: "pending", expires_at: "" }, []) });
+  await assert.rejects(c.createImage({ prompt: "x", image_upload_ids: ["u1"] }), /pending/);
+});
+
+test("create_image refuses local paths on the hosted connector", async () => {
+  const c = new CraftStoryClient({ apiKey: "k", allowLocalFiles: false, fetchImpl: fakeFetch(201, {}, []) });
+  await assert.rejects(c.createImage({ prompt: "x", image_paths: ["/tmp/a.png"] }), /request_file_upload/);
+});
+
+test("create_music posts JSON and image/music jobs poll their own paths", async () => {
+  const calls: Call[] = [];
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(201, { id: "m1", status: "created", credits: 30 }, calls) });
+  await c.createMusic({ prompt: "lo-fi", duration_s: 30 });
+  assert.equal(calls[0].url, "https://api.craftstory.com/api/v1/music/");
+  assert.deepEqual(JSON.parse(String(calls[0].body)), { prompt: "lo-fi", duration_s: 30 });
+  await c.getStatus("image", "i1");
+  await c.getStatus("music", "m1");
+  assert.equal(calls[1].url, "https://api.craftstory.com/api/v1/images/i1/status/");
+  assert.equal(calls[2].url, "https://api.craftstory.com/api/v1/music/m1/status/");
+});
+
+test("503 carries the API's own reason", async () => {
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(503, { detail: "Music generation is temporarily unavailable" }, []) });
+  await assert.rejects(c.createMusic({ prompt: "x" }), /Music generation is temporarily unavailable/);
+});

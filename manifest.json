@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "craftstory",
   "display_name": "CraftStory",
-  "version": "0.1.8",
-  "description": "Talking-avatar videos from a photo: CraftStory 2.0 (any length, lip-sync, gestures) and MiniMax H3 clips with generated sound, straight from Claude.",
-  "long_description": "Turn a photo into a talking video from Claude. Pick a voice, write the script, and get a lip-synced video with natural gestures (CraftStory 2.0, any length, 8-15 minutes per video), or a short clip with generated sound (MiniMax H3, up to 15 s). Uses your CraftStory account and credits; a plan with API access and an API key from Account -> API Access are required.",
+  "version": "0.6.0",
+  "description": "Talking-avatar videos from a photo (CraftStory 2.0), MiniMax H3 clips with generated sound, Nano Banana images and music tracks, straight from Claude.",
+  "long_description": "Turn a photo into a talking video from Claude. Pick a voice, write the script, and get a lip-synced video with natural gestures (CraftStory 2.0, any length, 8-15 minutes per video), or a short clip with generated sound (MiniMax H3, up to 15 s). Make the photo itself with Nano Banana in the shape you need, and a music bed for the video. Uses your CraftStory account and credits; a plan with API access and an API key from Account -> API Access are required.",
   "author": {
     "name": "CraftStory",
     "url": "https://craftstory.com"
@@ -41,39 +41,63 @@
     },
     {
       "name": "list_avatars",
-      "description": "Custom avatars trained in the CraftStory app that craftstory-2 can generate with (pass an id as avatar_id). Each avatar may carry a default voice {id, voice_kind}: voice_kind 'user' means send it as voice_user_id, 'library' as voice_id in create_audio_clip. Pass avatar_id to list that avatar's scenes; a scene id can replace the photo (scene_id) in create_craftstory2_video."
+      "description": "Custom avatars trained in the CraftStory app that craftstory-2 can generate with (pass an id as avatar_id); `models` lists which endpoints take the id — when it includes 'minimax-h3' the avatar also works with create_minimax_h3_avatar_video. Each avatar may carry a default voice {id, voice_kind}: voice_kind 'user' means send it as voice_user_id, 'library' as voice_id in create_audio_clip. Pass avatar_id to list that avatar's scenes; a scene id can replace the photo (scene_id) in create_craftstory2_video."
     },
     {
       "name": "create_audio_clip",
-      "description": "The soundtrack every video model takes as input. Either text (up to 2000 characters) plus exactly one voice (voice_id from list_voices, or voice_user_id for a cloned voice), or file_path to upload a local WAV/MP3/M4A recording. Returns the clip id; it is ready when wait_for_job(model='audio-clip') reports done (usually seconds). Longer scripts: create several clips and pass all ids to create_craftstory2_video in order."
+      "description": "The soundtrack every video model takes as input. Either text (up to 2000 characters) plus exactly one voice (voice_id from list_voices, or voice_user_id for a cloned voice), or a recording: file_path (local WAV/MP3/M4A) or audio_upload_id (a file the user dropped on an upload link from request_file_upload with kind='audio'). Returns the clip id; it is ready when wait_for_job(model='audio-clip') reports done (usually seconds). Longer scripts: create several clips and pass all ids to create_craftstory2_video in order."
     },
     {
       "name": "preview_cost",
-      "description": "Credits a craftstory-2 job would cost for the given audio clips and settings, without creating anything. Rate per second of audio: 480p 2.2 (2 with lipsync_mode=empty), 720p 3.3 (3 with empty); rounded up per job. MiniMax H3 is a flat 3.3 credits per billed second."
+      "description": "Credits a craftstory-2 job would cost for the given audio clips and settings, without creating anything. Rate per second of audio: 480p 2.2 (2 with lipsync_mode=empty), 720p 3.3 (3 with empty); rounded up per job. MiniMax H3: 4.2 credits per billed second (basic and reference modes), 5.6 in avatar mode."
     },
     {
       "name": "create_craftstory2_video",
-      "description": "Start a craftstory-2 generation: a photo of a person (image_url or image_path, or a custom avatar scene via scene_id) speaks the given audio clips with lip-sync, gestures and natural motion; any length. resolution is WIDTH_HEIGHT (480_832 / 720_1280 portrait, 832_480 / 1280_720 landscape); 1080p is available afterwards via upscale_video. Credits are charged on create (see preview_cost) and refunded if the job fails. Returns the job id and initial status; generation takes 8-15 minutes, so call wait_for_job(model='craftstory-2') repeatedly until it reports done, then get_job_result for the video URL."
+      "description": "Start a craftstory-2 generation: a photo of a person (image_url or image_path, or a custom avatar scene via scene_id) speaks the given audio clips with lip-sync, gestures and natural motion; any length. With avatar_id a photo is OPTIONAL: pass scene_id (from list_avatars with avatar_id) or omit both and the avatar's first scene is used. When the user names an avatar or a scene, do not ask for a photo. resolution is WIDTH_HEIGHT (480_832 / 720_1280 portrait, 832_480 / 1280_720 landscape, 768_960 for 4:5 portrait billed as 720p, audio under 30 minutes); a 1.5x upscale is available afterwards via upscale_video. Credits are charged on create (see preview_cost) and refunded if the job fails. Returns the job id and initial status; generation takes 8-15 minutes, so call wait_for_job(model='craftstory-2') repeatedly until it reports done, then get_job_result for the video URL."
     },
     {
       "name": "create_minimax_h3_video",
-      "description": "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. mode='reference': the reference model. With audio_clip_id the clip is lip-synced to it (first 15 s billed) and user_prompt is optional. Without audio_clip_id, pass requested_duration_s and a user_prompt with the spoken line in quotes: the model voices it and generates the soundtrack. Either way up to 8 extra image / 3 video / 2 audio reference_files with reference_captions keep a second person, a product or a background consistent. Output is 768 px on the short side, orientation follows the photo. Cost 3.3 credits per billed second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min)."
+      "description": "Start a minimax-h3 generation from one photo. mode='basic': user_prompt (scene description) + requested_duration_s (5-15); the model animates the photo and generates the soundtrack itself. mode='reference': the reference model. With audio_clip_id the clip is lip-synced to it (first 15 s billed) and user_prompt is optional. Without audio_clip_id, pass requested_duration_s and a user_prompt with the spoken line in quotes: the model voices it and generates the soundtrack. Either way up to 8 extra image / 3 video / 2 audio references keep a second person, a product or a background consistent: reference_files (local paths) and/or reference_upload_ids (files the user dropped on upload links, any kind), with reference_captions in the same order (files first, then uploads). Output is ~1 MP at the chosen aspect_ratio (auto follows the photo). Cost 4.2 credits per billed second (basic and reference), charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (1-3 min)."
+    },
+    {
+      "name": "create_minimax_h3_avatar_video",
+      "description": "Avatar mode of minimax-h3: a custom avatar from list_avatars (its `models` must include 'minimax-h3'; sample actors are not accepted) says speech_text verbatim in its own voice, inside one of its scenes (scene_id, default the first; see list_avatars with avatar_id). No photo and no audio clip are sent: the avatar's training video teaches the model the face, voice and manner. user_prompt describes the scene and manner. 5-14 s: pass requested_duration_s or let the length follow the text (about 15 characters per second). Up to 3 extra references (reference_files local paths and/or reference_upload_ids from request_file_upload), images or audio, no video; extra photos lower the ceiling (0-1: 14 s, 2: 12 s, 3: 10 s). The first run of an avatar builds its profile (about a minute more); later runs reuse it. Cost 5.6 credits per second, charged on create. Returns the job id; call wait_for_job(model='minimax-h3') until done (10-25 min)."
+    },
+    {
+      "name": "create_image",
+      "description": "Generate or edit a picture from a prompt. Without source pictures the model draws from the prompt alone; with them it edits the first one or takes people, products and places from them (up to 8: image_urls, image_paths, and/or image_upload_ids from request_file_upload kind='image'). aspect_ratio: 9:16, 16:9, 4:5, 1:1, 3:4 or 4:3; leave it out to keep the shape of the first source picture. model: nano-banana (default, 13 credits) or nano-banana-pro (25 credits; better with text in the picture, fine detail and several people). Charged on create, refunded if the image fails or is rejected. Returns the job id; wait_for_job(model='image') is done in 10-25 s and its result carries image_url - a ready image_url for create_craftstory2_video or create_minimax_h3_video, or a source picture for the next create_image."
+    },
+    {
+      "name": "create_music",
+      "description": "Generate a music track from a description of genre, mood, instruments and tempo, e.g. a bed for a video. Instrumental by default; set instrumental=false and describe the vocals or give the lyrics in the prompt for a song. Prompts that name an artist, an existing song or copyrighted lyrics are declined (status_failed='rejected_prompt'); the record then carries prompt_suggestion, a rewritten prompt that would pass - offer it to the user. Cost 1 credit per second (5 minimum), charged on create, refunded on failure. Returns the job id; wait_for_job(model='music') until done (about as long as the track), the result has audio_url (MP3). If the call answers 503, music generation is switched off for now."
     },
     {
       "name": "get_job_status",
-      "description": "Status of a video job or audio clip: status, status_percentage, status_failed, credits_refunded. Terminal states: done; failed*, rejected_* and not_pass_moderation (audio) are failures. Prefer wait_for_job, which polls for you."
+      "description": "Status of a video job, audio clip, image or music track: status, status_percentage, status_failed, credits_refunded. Terminal states: done; failed*, rejected_* and not_pass_moderation (audio) are failures. Prefer wait_for_job, which polls for you."
     },
     {
       "name": "get_job_result",
-      "description": "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`; all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged."
+      "description": "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`, for images in `image_url` (PNG), for music in `audio_url` (MP3); all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged."
     },
     {
       "name": "wait_for_job",
-      "description": "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, audio clips seconds. Reports progress notifications when the client supports them."
+      "description": "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, images 10-25 seconds, music about as long as the track, audio clips seconds. Reports progress notifications when the client supports them."
+    },
+    {
+      "name": "request_file_upload",
+      "description": "Use this when the user wants to use a file that is not reachable by URL: a photo, recording or video attached to the chat or on their phone or disk. kind: image (JPG/PNG/HEIC, 20 MB; use the file_url as image_url), audio (MP3/WAV/M4A/OGG/FLAC, 100 MB; pass upload_id as audio_upload_id to create_audio_clip or in reference_upload_ids), video (MP4/MOV/WebM/MKV, 100 MB; pass upload_id in reference_upload_ids of create_minimax_h3_video). Returns a one-time upload slot (valid 15 minutes). If the file is one you can read yourself (you can run shell commands and know its path), upload it yourself with the returned curl_command and then call get_upload - the user does not need to do anything. Otherwise show the COMPLETE upload_url to the user verbatim (never shorten or paraphrase it), ask them to open it and drop the file, then call wait_for_upload (or get_upload after they say it is uploaded). Never invent a file URL."
+    },
+    {
+      "name": "get_upload",
+      "description": "Status of a one-time upload link: pending, uploaded or expired. For images the file_url (valid about an hour) is what create_* tools take as image_url; audio and video uploads are referenced by upload_id (audio_upload_id, reference_upload_ids)."
+    },
+    {
+      "name": "wait_for_upload",
+      "description": "Polls an upload link for up to timeout_s (default 45, max 55) and returns as soon as the file is there or the link expired. If it returns pending, do not loop: tell the user you are waiting, and call get_upload once they confirm the upload."
     },
     {
       "name": "upscale_video",
-      "description": "Creates a NEW job with the upscaled result; the original stays. craftstory-2: only 720p sources, resolution 1080_1920 (from 720_1280) or 1920_1080 (from 1280_720). minimax-h3: always 2x, no resolution needed. Costs 0.2 credits per second. Poll the returned id with wait_for_job."
+      "description": "Creates a NEW job with the upscaled result; the original stays. craftstory-2: only 720p-tier sources, resolution 1080_1920 (from 720_1280), 1920_1080 (from 1280_720) or 1152_1440 (from 768_960). minimax-h3: always 2x, no resolution needed. Costs 0.2 credits per second. Poll the returned id with wait_for_job."
     }
   ],
   "prompts": [

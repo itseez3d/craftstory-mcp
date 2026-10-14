@@ -13,7 +13,8 @@ const RESOLUTIONS = ["480_832", "832_480", "720_1280", "1280_720", "768_960"] as
 const UPSCALE_RESOLUTIONS = ["1080_1920", "1920_1080", "1152_1440"] as const;
 const GESTURES = ["normal", "calm", "expressive"] as const;
 const LIPSYNC = ["craftstory", "sync_so", "empty"] as const;
-const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip"] as const;
+const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip", "image", "music"] as const;
+const IMAGE_ASPECTS = ["9:16", "16:9", "4:5", "1:1", "3:4", "4:3"] as const;
 
 const text = (data: unknown) => ({ content: [{ type: "text" as const, text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] });
 const fail = (err: unknown) => ({ isError: true, content: [{ type: "text" as const, text: err instanceof Error ? err.message : String(err) }] });
@@ -25,7 +26,7 @@ export interface ServerOptions {
 
 export function buildServer(client: CraftStoryClient, options: ServerOptions = {}): McpServer {
   const publicApiBase = (options.publicApiBase ?? "https://api.craftstory.com/api/v1").replace(/\/+$/, "");
-  const server = new McpServer({ name: "craftstory", version: "0.3.1" });
+  const server = new McpServer({ name: "craftstory", version: "0.6.0" });
 
   server.registerTool(
     "list_models",
@@ -278,12 +279,69 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
   );
 
   server.registerTool(
+    "create_image",
+    {
+      title: "Create an image (Nano Banana), optionally from your pictures",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      description:
+        "Generate or edit a picture from a prompt. Without source pictures the model draws from the prompt alone; with them it edits the first one or takes people, products and places from them (up to 8: image_urls, image_paths, and/or image_upload_ids from request_file_upload kind='image'). " +
+        "aspect_ratio: 9:16, 16:9, 4:5, 1:1, 3:4 or 4:3; leave it out to keep the shape of the first source picture. " +
+        "model: nano-banana (default, 13 credits) or nano-banana-pro (25 credits; better with text in the picture, fine detail and several people). Charged on create, refunded if the image fails or is rejected. " +
+        "Returns the job id; wait_for_job(model='image') is done in 10-25 s and its result carries image_url - a ready image_url for create_craftstory2_video or create_minimax_h3_video, or a source picture for the next create_image.",
+      inputSchema: {
+        prompt: z.string().min(1).max(2000).describe("What to draw, or how to change the source pictures"),
+        model: z.enum(["nano-banana", "nano-banana-pro"]).optional(),
+        aspect_ratio: z.enum(IMAGE_ASPECTS).optional(),
+        image_urls: z.array(z.string().url()).max(8).optional().describe("Public https URLs of source pictures (an image_url from an earlier result works too)"),
+        image_paths: z.array(z.string()).max(8).optional().describe("Local paths of source pictures to upload (JPG/PNG/WebP)"),
+        image_upload_ids: z.array(z.string().uuid()).max(8).optional().describe("upload_ids of pictures the user uploaded via request_file_upload (kind='image')"),
+      },
+    },
+    async (a) => {
+      try {
+        const sources = (a.image_urls?.length ?? 0) + (a.image_paths?.length ?? 0) + (a.image_upload_ids?.length ?? 0);
+        if (sources > 8) throw new Error("Up to 8 source pictures in total");
+        const r = await client.createImage(a);
+        return text({ id: r.id, status: r.status, model: r.model, aspect_ratio: r.aspect_ratio, credits: r.credits, next: "wait_for_job(model='image', id=...) - usually done in 10-25 s; the result has image_url" });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_music",
+    {
+      title: "Create a music track (5-180 s)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      description:
+        "Generate a music track from a description of genre, mood, instruments and tempo, e.g. a bed for a video. Instrumental by default; set instrumental=false and describe the vocals or give the lyrics in the prompt for a song. " +
+        "Prompts that name an artist, an existing song or copyrighted lyrics are declined (status_failed='rejected_prompt'); the record then carries prompt_suggestion, a rewritten prompt that would pass - offer it to the user. " +
+        "Cost 1 credit per second (5 minimum), charged on create, refunded on failure. Returns the job id; wait_for_job(model='music') until done (about as long as the track), the result has audio_url (MP3). " +
+        "If the call answers 503, music generation is switched off for now.",
+      inputSchema: {
+        prompt: z.string().min(1).max(2000).describe("Genre, mood, instruments, tempo; no artist or song names"),
+        duration_s: z.number().int().min(5).max(180).optional().describe("Track length in seconds (default 30)"),
+        instrumental: z.boolean().optional().describe("Default true; false for a song with vocals"),
+      },
+    },
+    async (a) => {
+      try {
+        const r = await client.createMusic(a);
+        return text({ id: r.id, status: r.status, duration_s: r.duration_s, credits: r.credits, next: "wait_for_job(model='music', id=...) until done, then the result has audio_url" });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "get_job_status",
     {
       title: "Get a job's status",
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
-        "Status of a video job or audio clip: status, status_percentage, status_failed, credits_refunded. Terminal states: done; failed*, rejected_* and not_pass_moderation (audio) are failures. " +
+        "Status of a video job, audio clip, image or music track: status, status_percentage, status_failed, credits_refunded. Terminal states: done; failed*, rejected_* and not_pass_moderation (audio) are failures. " +
         "Prefer wait_for_job, which polls for you.",
       inputSchema: { model: z.enum(JOB_KINDS), id: z.string().uuid() },
     },
@@ -302,7 +360,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       title: "Get a finished job (video URL and details)",
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
-        "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`; all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
+        "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`, for images in `image_url` (PNG), for music in `audio_url` (MP3); all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
       inputSchema: { model: z.enum(JOB_KINDS), id: z.string().uuid() },
     },
     async ({ model, id }) => {
@@ -321,7 +379,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. " +
-        "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, audio clips seconds. Reports progress notifications when the client supports them.",
+        "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, images 10-25 seconds, music about as long as the track, audio clips seconds. Reports progress notifications when the client supports them.",
       inputSchema: {
         model: z.enum(JOB_KINDS),
         id: z.string().uuid(),
@@ -349,7 +407,8 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
           }
           if (state !== "running") {
             let result: Record<string, unknown> | undefined;
-            if (state === "done") {
+            // A declined music prompt comes back with a rewritten one: hand it over at once.
+            if (state === "done" || (model === "music" && last.status_failed === "rejected_prompt")) {
               try {
                 result = await client.getResult(model as JobKind, id, Math.min(10_000, Math.max(3_000, deadline - Date.now())));
               } catch {
@@ -360,7 +419,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
           }
           const remaining = deadline - Date.now();
           if (remaining <= 0) return running();
-          await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" ? 2000 : 5000, remaining)));
+          await new Promise((r) => setTimeout(r, Math.min(model === "audio-clip" || model === "image" ? 2000 : 5000, remaining)));
         }
       } catch (e) {
         return fail(e);
