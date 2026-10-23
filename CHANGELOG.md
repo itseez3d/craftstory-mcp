@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- `create_image`: two more models, `seedream-5-pro` (ByteDance Seedream 5.0 Pro, 13 credits) and `flux-3`
+  (Black Forest Labs FLUX.3 Image, 14 credits); prices now 10 for `nano-banana` and 39 for `nano-banana-pro`.
+
 ## 0.6.0
 
 - `create_image`: Nano Banana / Nano Banana Pro images from a prompt and up to 8 source pictures

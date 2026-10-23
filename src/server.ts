@@ -281,16 +281,16 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
   server.registerTool(
     "create_image",
     {
-      title: "Create an image (Nano Banana), optionally from your pictures",
+      title: "Create an image (Nano Banana, Seedream, FLUX.3), optionally from your pictures",
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Generate or edit a picture from a prompt. Without source pictures the model draws from the prompt alone; with them it edits the first one or takes people, products and places from them (up to 8: image_urls, image_paths, and/or image_upload_ids from request_file_upload kind='image'). " +
         "aspect_ratio: 9:16, 16:9, 4:5, 1:1, 3:4 or 4:3; leave it out to keep the shape of the first source picture. " +
-        "model: nano-banana (default, 13 credits) or nano-banana-pro (25 credits; better with text in the picture, fine detail and several people). Charged on create, refunded if the image fails or is rejected. " +
-        "Returns the job id; wait_for_job(model='image') is done in 10-25 s and its result carries image_url - a ready image_url for create_craftstory2_video or create_minimax_h3_video, or a source picture for the next create_image.",
+        "model: nano-banana (default, 10 credits), nano-banana-pro (39 credits; better with text in the picture, fine detail and several people), seedream-5-pro (13 credits; ByteDance Seedream 5.0 Pro, strong multi-reference fusion and product shots) or flux-3 (14 credits; Black Forest Labs FLUX.3 Image, photoreal detail and typography). Charged on create, refunded if the image fails or is rejected. " +
+        "Returns the job id; wait_for_job(model='image') is done in 10-25 s for the Nano Banana models and 30-120 s for seedream-5-pro and flux-3, and its result carries image_url - a ready image_url for create_craftstory2_video or create_minimax_h3_video, or a source picture for the next create_image.",
       inputSchema: {
         prompt: z.string().min(1).max(2000).describe("What to draw, or how to change the source pictures"),
-        model: z.enum(["nano-banana", "nano-banana-pro"]).optional(),
+        model: z.enum(["nano-banana", "nano-banana-pro", "seedream-5-pro", "flux-3"]).optional(),
         aspect_ratio: z.enum(IMAGE_ASPECTS).optional(),
         image_urls: z.array(z.string().url()).max(8).optional().describe("Public https URLs of source pictures (an image_url from an earlier result works too)"),
         image_paths: z.array(z.string()).max(8).optional().describe("Local paths of source pictures to upload (JPG/PNG/WebP)"),
