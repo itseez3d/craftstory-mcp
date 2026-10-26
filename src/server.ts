@@ -7,13 +7,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { classify, CraftStoryClient, type JobKind } from "./client.js";
+import { classify, CLOUD_MODELS, CraftStoryClient, type CloudModelId, type JobKind } from "./client.js";
 
 const RESOLUTIONS = ["480_832", "832_480", "720_1280", "1280_720", "768_960"] as const;
 const UPSCALE_RESOLUTIONS = ["1080_1920", "1920_1080", "1152_1440"] as const;
 const GESTURES = ["normal", "calm", "expressive"] as const;
 const LIPSYNC = ["craftstory", "sync_so", "empty"] as const;
-const JOB_KINDS = ["craftstory-2", "minimax-h3", "audio-clip", "image", "music", "sound-effect"] as const;
+const CLOUD_KINDS = ["seedance-2.5", "flux-3-video", "flux-3-max", "minimax-h3-max", "heygen-video", "gemini-omni-flash"] as const;
+const JOB_KINDS = ["craftstory-2", "minimax-h3", ...CLOUD_KINDS, "audio-clip", "image", "music", "sound-effect"] as const;
+const CLOUD_RESOLUTIONS = ["480p", "720p", "768p", "1080p"] as const;
+const CLOUD_ASPECTS = ["auto", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "2:1"] as const;
 const IMAGE_ASPECTS = ["9:16", "16:9", "4:5", "1:1", "3:4", "4:3"] as const;
 
 const text = (data: unknown) => ({ content: [{ type: "text" as const, text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] });
@@ -26,7 +29,7 @@ export interface ServerOptions {
 
 export function buildServer(client: CraftStoryClient, options: ServerOptions = {}): McpServer {
   const publicApiBase = (options.publicApiBase ?? "https://api.craftstory.com/api/v1").replace(/\/+$/, "");
-  const server = new McpServer({ name: "craftstory", version: "0.6.0" });
+  const server = new McpServer({ name: "craftstory", version: "0.8.0" });
 
   server.registerTool(
     "list_models",
@@ -35,8 +38,9 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Catalogue of the video models behind this server with their status, modes, limits and credit prices. " +
-        "Two models today: craftstory-2 (a talking video of any length from one photo plus an audio clip; 8-15 min) " +
-        "and minimax-h3 (a clip of up to 15 s from one photo, either description-driven with generated sound or audio-driven with lip-sync; 1-3 min). " +
+        "Eight models: craftstory-2 (a talking video of any length from one photo plus an audio clip; 8-15 min), " +
+        "minimax-h3 (a clip of up to 15 s from one photo, description-driven with generated sound or audio-driven with lip-sync; 1-3 min), " +
+        "and six photo-as-first-frame models behind create_cloud_video: seedance-2.5, flux-3-video, flux-3-max, minimax-h3-max, heygen-video, gemini-omni-flash. " +
         "Call this first when unsure which model fits, or to check that a model is not paused.",
       inputSchema: {},
     },
@@ -279,6 +283,77 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
   );
 
   server.registerTool(
+    "preview_cloud_video_cost",
+    {
+      title: "Price a cloud-model clip before creating it",
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      description:
+        "Credits a create_cloud_video job would cost for the given model, duration and resolution, without creating anything. " +
+        "Same price on every duration: cost is per second of output, rounded up once per job.",
+      inputSchema: {
+        model: z.enum(CLOUD_KINDS),
+        duration_s: z.number().int().min(3).max(30),
+        resolution: z.enum(CLOUD_RESOLUTIONS),
+      },
+    },
+    async ({ model, duration_s, resolution }) => {
+      try {
+        return text(await client.previewCloudCost(model as CloudModelId, { duration_s, resolution }));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_cloud_video",
+    {
+      title: "Create a clip from a photo with a cloud model (Seedance, FLUX 3, H3 Max, HeyGen, Gemini Omni)",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      description:
+        "One photo becomes the first frame of a short clip; user_prompt says how the scene unfolds and what is said - every model writes and speaks its own soundtrack. " +
+        "Models and limits: seedance-2.5 (4-30 s; 480p/720p/1080p; aspect_ratio optional; 14.7/33/60.9 credits per second; 3-10 min), " +
+        "flux-3-video (5-20 s; 720p/1080p; aspect_ratio optional incl. 2:1; 15.8/26.9 per second; 2-5 min), flux-3-max (same as flux-3-video, several times faster, takes seed), " +
+        "minimax-h3-max (5-15 s; 480p/768p/1080p; no aspect_ratio - the clip keeps the photo's proportions; 4.7/7.5/14.9 per second; under a minute), " +
+        "heygen-video (5-15 s; 480p/768p/1080p; no aspect_ratio; 1.9/1.9/5.6 per second - the budget option; under a minute), " +
+        "gemini-omni-flash (3-10 s; 720p only; aspect_ratio 16:9 or 9:16 only when the photo has that shape, otherwise leave auto; no seed; 9.4 per second; under a minute). " +
+        "Credits are charged on create and refunded if the job fails or is rejected; photos of real people are often declined by seedance-2.5's own check. " +
+        "Returns the job id; call wait_for_job(model=<the same model id>) until done, then get_job_result for video_url.",
+      inputSchema: {
+        model: z.enum(CLOUD_KINDS),
+        image_url: z.string().url().optional().describe("Public URL of the photo, or the file_url from wait_for_upload / get_upload"),
+        image_path: z.string().optional().describe("Local path of the photo (stdio only)"),
+        user_prompt: z.string().min(1).max(4000).describe("What happens in the clip: action, mood, camera, the words to be said"),
+        duration_s: z.number().int().min(3).max(30).describe("Clip length in whole seconds, inside the model's window"),
+        resolution: z.enum(CLOUD_RESOLUTIONS).optional().describe("Default 720p (768p for minimax-h3-max and heygen-video)"),
+        aspect_ratio: z.enum(CLOUD_ASPECTS).optional().describe("auto (default) follows the photo; see the model list for what each accepts"),
+        seed: z.number().int().min(0).optional().describe("Repeat a previous result (seedance-2.5, flux-3-max, minimax-h3-max, heygen-video)"),
+        name: z.string().optional(),
+      },
+    },
+    async (a) => {
+      try {
+        if (!a.image_url && !a.image_path) throw new Error("Pass image_url or image_path");
+        const model = a.model as CloudModelId;
+        const resolution = a.resolution ?? (model === "minimax-h3-max" || model === "heygen-video" ? "768p" : "720p");
+        const r = await client.createCloudVideo({
+          model,
+          image: { url: a.image_url, path: a.image_path },
+          user_prompt: a.user_prompt,
+          duration_s: a.duration_s,
+          resolution,
+          aspect_ratio: a.aspect_ratio,
+          seed: a.seed,
+          name: a.name,
+        });
+        return text({ id: r.id, status: r.status, model, credits: r.credits, next: `wait_for_job(model='${model}', id=...) until done, then get_job_result` });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "create_image",
     {
       title: "Create an image (Nano Banana, Seedream, FLUX.3), optionally from your pictures",
@@ -387,7 +462,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       title: "Get a finished job (video URL and details)",
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
-        "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 in `video_url`, for audio clips in `file`, for images in `image_url` (PNG), for music and sound effects in `audio_url` (MP3); all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
+        "Full record of a job. For craftstory-2 the video is in `video`, for minimax-h3 and the cloud models in `video_url`, for audio clips in `file`, for images in `image_url` (PNG), for music and sound effects in `audio_url` (MP3); all are signed URLs valid for 7 days (call again for a fresh link). Also returns the parameters used and the credits charged.",
       inputSchema: { model: z.enum(JOB_KINDS), id: z.string().uuid() },
     },
     async ({ model, id }) => {
@@ -406,7 +481,7 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Polls a job's status every few seconds for up to timeout_s (default 45, max 55 - most MCP clients cut a tool call at 60 s) and returns as soon as it is terminal. " +
-        "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, images 10-25 seconds, sound effects a few seconds, music about as long as the track, audio clips seconds. Reports progress notifications when the client supports them.",
+        "If it returns state='running', call it again - craftstory-2 jobs take 8-15 minutes, minimax-h3 1-3 minutes, seedance-2.5 3-10 minutes, flux-3-video 2-5 minutes, the other cloud models under a minute, images 10-25 seconds, sound effects a few seconds, music about as long as the track, audio clips seconds. Reports progress notifications when the client supports them.",
       inputSchema: {
         model: z.enum(JOB_KINDS),
         id: z.string().uuid(),
@@ -555,10 +630,10 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
       title: "Upscale a finished video (new job)",
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
-        "Creates a NEW job with the upscaled result; the original stays. craftstory-2: only 720p-tier sources, resolution 1080_1920 (from 720_1280), 1920_1080 (from 1280_720) or 1152_1440 (from 768_960). minimax-h3: always 2x, no resolution needed. " +
+        "Creates a NEW job with the upscaled result; the original stays. Cloud models (seedance-2.5, flux-3-*, minimax-h3-max, heygen-video, gemini-omni-flash): 2x from 480p / 720p / 768p, 1080p cannot be upscaled. craftstory-2: only 720p-tier sources, resolution 1080_1920 (from 720_1280), 1920_1080 (from 1280_720) or 1152_1440 (from 768_960). minimax-h3: always 2x, no resolution needed. " +
         "Costs 0.2 credits per second. Poll the returned id with wait_for_job.",
       inputSchema: {
-        model: z.enum(["craftstory-2", "minimax-h3"]),
+        model: z.enum(["craftstory-2", "minimax-h3", ...CLOUD_KINDS]),
         id: z.string().uuid(),
         resolution: z.enum(UPSCALE_RESOLUTIONS).optional().describe("craftstory-2 only"),
       },
@@ -568,6 +643,10 @@ export function buildServer(client: CraftStoryClient, options: ServerOptions = {
         if (model === "craftstory-2") {
           if (!resolution) throw new Error("craftstory-2 upscale needs resolution 1080_1920, 1920_1080 or 1152_1440");
           const r = await client.upscaleCraftStory2(id, resolution);
+          return text({ id: r.id, status: r.status, credits: r.credits });
+        }
+        if ((CLOUD_MODELS as string[]).includes(model)) {
+          const r = await client.upscaleCloudVideo(model as CloudModelId, id);
           return text({ id: r.id, status: r.status, credits: r.credits });
         }
         const r = await client.upscaleMiniMaxH3(id);

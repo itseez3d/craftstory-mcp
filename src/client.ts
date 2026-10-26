@@ -14,7 +14,10 @@ export const USER_AGENT = "craftstory-mcp/0.6.0";
 /** Per-request HTTP timeout; keeps every tool call well under MCP clients' ~60 s limit. */
 export const REQUEST_TIMEOUT_MS = 25_000;
 
-export type ModelId = "craftstory-2" | "minimax-h3";
+export type ModelId = "craftstory-2" | "minimax-h3" | CloudModelId;
+/** Photo-as-first-frame models served through one shared shape (POST /{model}/, status, result, upscale). */
+export type CloudModelId = "seedance-2.5" | "flux-3-video" | "flux-3-max" | "minimax-h3-max" | "heygen-video" | "gemini-omni-flash";
+export const CLOUD_MODELS: CloudModelId[] = ["seedance-2.5", "flux-3-video", "flux-3-max", "minimax-h3-max", "heygen-video", "gemini-omni-flash"];
 export type JobKind = ModelId | "audio-clip" | "image" | "music" | "sound-effect";
 export type UploadKind = "image" | "audio" | "video";
 
@@ -381,6 +384,40 @@ export class CraftStoryClient {
     return this.post<Record<string, unknown>>(`/minimax-h3/${id}/upscale/`);
   }
 
+  // ---- cloud photo-to-video models (Seedance, FLUX 3, H3 Max, HeyGen, Omni) --
+  /** The API mount of a cloud model: seedance-2.5 lives at /seedance/, the rest under their own id. */
+  cloudMount(model: CloudModelId): string {
+    return model === "seedance-2.5" ? "seedance" : model;
+  }
+  async createCloudVideo(args: {
+    model: CloudModelId;
+    image: { url?: string; path?: string };
+    user_prompt: string;
+    duration_s: number;
+    resolution: string;
+    aspect_ratio?: string;
+    seed?: number;
+    name?: string;
+  }) {
+    const fd = new FormData();
+    const img = await fileOrUrl(args.image, "image", this.allowLocalFiles);
+    if (img.url) fd.append("image", img.url);
+    else fd.append("image", img.blob!, img.name);
+    fd.append("user_prompt", args.user_prompt);
+    fd.append("duration_s", String(args.duration_s));
+    fd.append("resolution", args.resolution);
+    if (args.aspect_ratio && args.aspect_ratio !== "auto") fd.append("aspect_ratio", args.aspect_ratio);
+    if (args.seed !== undefined) fd.append("seed", String(args.seed));
+    if (args.name) fd.append("name", args.name);
+    return this.post<Record<string, unknown>>(`/${this.cloudMount(args.model)}/`, fd, MEDIA_POST_TIMEOUT_MS);
+  }
+  previewCloudCost(model: CloudModelId, body: { duration_s: number; resolution: string }) {
+    return this.post<{ credits: number }>(`/${this.cloudMount(model)}/preview-cost/`, body);
+  }
+  upscaleCloudVideo(model: CloudModelId, id: string) {
+    return this.post<Record<string, unknown>>(`/${this.cloudMount(model)}/${id}/upscale/`);
+  }
+
   // ---- one-time upload links -------------------------------------------
   createUploadLink(body: { kind: UploadKind; hint?: string }) {
     return this.post<{ id: string; kind: UploadKind; upload_url: string; expires_at: string; status: string }>("/uploads/", body);
@@ -391,7 +428,7 @@ export class CraftStoryClient {
 
   // ---- generic job access ---------------------------------------------
   jobPath(kind: JobKind, id: string) {
-    const base = { "audio-clip": "/audio/clips", image: "/images", music: "/music", "sound-effect": "/sound-effects" }[kind as string] ?? `/${kind}`;
+    const base = { "audio-clip": "/audio/clips", image: "/images", music: "/music", "sound-effect": "/sound-effects", "seedance-2.5": "/seedance" }[kind as string] ?? `/${kind}`;
     return `${base}/${id}/`;
   }
   getStatus(kind: JobKind, id: string, timeoutMs?: number) {

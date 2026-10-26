@@ -156,6 +156,7 @@ test("valid token: initialize, tools/list and a tool call that forwards the toke
   const tools = ((await list.json()) as { result: { tools: { name: string }[] } }).result.tools.map((t) => t.name);
   assert.ok(tools.includes("list_models"));
   assert.ok(tools.includes("create_minimax_h3_video"));
+  assert.ok(tools.includes("create_cloud_video"));
 
   apiCalls.length = 0;
   const call = await rpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "list_models", arguments: {} } }, { Authorization: `Bearer ${token}` });

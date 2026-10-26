@@ -182,3 +182,22 @@ test("create_sound_effect posts JSON and polls /sound-effects/", async () => {
   await c.getStatus("sound-effect", "s1");
   assert.equal(calls[1].url, "https://api.craftstory.com/api/v1/sound-effects/s1/status/");
 });
+
+test("cloud models post to their own mount, seedance to /seedance/, auto ratio is omitted", async () => {
+  const calls: Call[] = [];
+  const c = new CraftStoryClient({ apiKey: "k", fetchImpl: fakeFetch(201, { id: "c" }, calls) });
+  await c.createCloudVideo({ model: "flux-3-max", image: { url: "https://x/p.jpg" }, user_prompt: "waves", duration_s: 5, resolution: "720p", aspect_ratio: "16:9", seed: 7 });
+  await c.createCloudVideo({ model: "seedance-2.5", image: { url: "https://x/p.jpg" }, user_prompt: "waves", duration_s: 5, resolution: "720p", aspect_ratio: "auto" });
+  await c.previewCloudCost("gemini-omni-flash", { duration_s: 5, resolution: "720p" });
+  await c.upscaleCloudVideo("heygen-video", "h1");
+  assert.equal(calls[0].url, "https://api.craftstory.com/api/v1/flux-3-max/");
+  const fd = calls[0].body as FormData;
+  assert.equal(fd.get("image"), "https://x/p.jpg");
+  assert.deepEqual([fd.get("duration_s"), fd.get("resolution"), fd.get("aspect_ratio"), fd.get("seed")], ["5", "720p", "16:9", "7"]);
+  assert.equal(calls[1].url, "https://api.craftstory.com/api/v1/seedance/");
+  assert.equal((calls[1].body as FormData).get("aspect_ratio"), null);
+  assert.equal(calls[2].url, "https://api.craftstory.com/api/v1/gemini-omni-flash/preview-cost/");
+  assert.equal(calls[3].url, "https://api.craftstory.com/api/v1/heygen-video/h1/upscale/");
+  assert.equal(c.jobPath("seedance-2.5", "x"), "/seedance/x/");
+  assert.equal(c.jobPath("minimax-h3-max", "x"), "/minimax-h3-max/x/");
+});

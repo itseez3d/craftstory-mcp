@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- `create_cloud_video` and `preview_cloud_video_cost`: six photo-as-first-frame models through one tool - `seedance-2.5`,
+  `flux-3-video`, `flux-3-max`, `minimax-h3-max`, `heygen-video`, `gemini-omni-flash` - with their limits and prices in the
+  tool description. `wait_for_job`, `get_job_status`, `get_job_result` and `upscale_video` take the same model ids.
+
 ## 0.7.0
 
 - `create_image`: two more models, `seedream-5-pro` (ByteDance Seedream 5.0 Pro, 13 credits) and `flux-3`

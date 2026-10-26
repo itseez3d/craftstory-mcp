@@ -77,10 +77,11 @@ Upload links (hosted mode and local alike): `request_file_upload(kind=image|audi
 - `preview_cost`: Credit estimate for a CraftStory 2.0 video
 - `create_craftstory2_video`: Start a CraftStory 2.0 job (photo or avatar scene + audio clips)
 - `create_minimax_h3_video`, `create_minimax_h3_avatar_video`: Start a MiniMax H3 job (basic, or reference mode with or without audio)
+- `create_cloud_video`, `preview_cloud_video_cost`: A clip from a photo as the first frame with one of the cloud models: `seedance-2.5` (4-30 s), `flux-3-video` / `flux-3-max` (5-20 s, 720p/1080p), `minimax-h3-max` and `heygen-video` (5-15 s, 480p/768p/1080p), `gemini-omni-flash` (3-10 s, 720p); the model writes and speaks its own soundtrack
 - `get_job_status`: Status, percentage, failure reason, refund flag
 - `get_job_result`: Full record with the signed video URL (valid 7 days)
 - `wait_for_job`: Bounded polling (default 45 s, max 55 s); call again while `state` is `running`
-- `upscale_video`: New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 2x)
+- `upscale_video`: New job with the upscaled result (CraftStory 2.0 720p -> 1080p, H3 and the cloud models 2x)
 - `create_image`: an image from a prompt, optionally from up to 8 of your pictures; `model` nano-banana (10 credits, default), nano-banana-pro (39), seedream-5-pro (13) or flux-3 (14); `aspect_ratio` 9:16, 16:9, 4:5, 1:1, 3:4, 4:3. The result's `image_url` goes straight into the video tools
 - `create_music`: Music track of 5-180 s from a description, instrumental by default (1 credit per second); a declined prompt comes back with `prompt_suggestion`
 - `create_sound_effect`: Sound effect or ambience of 0.5-30 s (or auto length), optional seamless loop (1 credit per started 5 s, 2 minimum)
